@@ -14,8 +14,7 @@ depends: [
   "topkg" {build}
   "ppx_sexp_conv" {build}
   "sexplib"
+  "alcotest" {test}
 ]
 depopts: []
-build:
-[[ "ocaml" "pkg/pkg.ml" "build"
-           "--installer" "true" ]]
+build: [[ "ocaml" "pkg/pkg.ml" "build" "--installer" "true" ]]
