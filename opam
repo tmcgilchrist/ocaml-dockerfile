@@ -1,23 +1,21 @@
 opam-version: "1.2"
-name: "dockerfile"
-version: "dev"
 maintainer: "Anil Madhavapeddy <anil@recoil.org>"
-authors: "Anil Madhavapeddy <anil@recoil.org>"
+authors: ["Anil Madhavapeddy <anil@recoil.org>"]
 homepage: "https://github.com/avsm/ocaml-dockerfile"
+doc: "https://anil-code.recoil.org/ocaml-dockerfile/doc"
 dev-repo: "https://github.com/avsm/ocaml-dockerfile.git"
 bug-reports: "https://github.com/avsm/ocaml-dockerfile/issues"
-tags: [ "org:mirage" "org:ocamllabs" ]
 license: "ISC"
-build: [
-  ["./configure" "--prefix=%{prefix}%"]
-  [make]
-]
-install: [make "install"]
-remove: ["ocamlfind" "remove" "dockerfile"]
+tags: [ "org:mirage" "org:ocamllabs" ]
+available: [ ocaml-version >= "4.02.0"]
 depends: [
-  "ocamlfind" {build} 
-  "cmdliner"
-  "ppx_sexp_conv"
-  "base-bytes"
+  "ocamlfind" {build}
+  "ocamlbuild" {build}
+  "topkg" {build}
+  "ppx_sexp_conv" {build}
+  "sexplib"
 ]
-available: [ ocaml-version >= "4.02.0" ]
+depopts: []
+build:
+[[ "ocaml" "pkg/pkg.ml" "build"
+           "--installer" "true" ]]

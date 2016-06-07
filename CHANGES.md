@@ -1,9 +1,7 @@
-1.7.0:
-* Add an `extra` arg the Dockerfile_distro matrix targets to
-  add more distros to the mix, such as Raspbian.
-* Support multiple OPAM versions in the matrix generation, 
-  to make testing OPAM master easier.
-* Add Ubuntu 16.10 to the distro list.
+2.0.0:
+* Breaking change: move `Dockerfile_distro` and `Dockerfile_opam`
+  into a separate `dockerfile-opam` package. This library is
+  now the pure Dockerfile eDSL in order to minimise dependencies.
 
 1.6.0:
 * Add a more modern Git in CentOS 6 to make it work with OPAM

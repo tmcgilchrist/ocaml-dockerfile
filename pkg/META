@@ -1,0 +1,7 @@
+description = "Library for manipulating Dockerfiles"
+version = "%%VERSION%%"
+requires = "sexplib"
+archive(byte) = "dockerfile.cma"
+archive(native) = "dockerfile.cmxa"
+plugin(byte) = "dockerfile.cma"
+plugin(native) = "dockerfile.cmxs"
