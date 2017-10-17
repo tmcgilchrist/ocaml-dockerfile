@@ -24,12 +24,12 @@
 
 type t = [ 
   | `Alpine of [ `V3_3 | `V3_4 | `V3_5 | `V3_6 | `Latest ]
-  | `CentOS of [ `V6 | `V7 ]
-  | `Debian of [ `V10 | `V9 | `V8 | `V7 | `Stable | `Testing | `Unstable ]
-  | `Fedora of [ `V21 | `V22 | `V23 | `V24 | `V25 ]
-  | `OracleLinux of [ `V7 ]
-  | `OpenSUSE of [ `V42_1 | `V42_2 ]
-  | `Ubuntu of [ `V12_04 | `V14_04 | `V15_04 | `V15_10 | `V16_04 | `V16_10 | `V17_04 ]
+  | `CentOS of [ `V6 | `V7 | `Latest ]
+  | `Debian of [ `V9 | `V8 | `V7 | `Stable | `Testing | `Unstable ]
+  | `Fedora of [ `V21 | `V22 | `V23 | `V24 | `V25 | `V26 | `Latest ]
+  | `OracleLinux of [ `V7 | `Latest ]
+  | `OpenSUSE of [ `V42_1 | `V42_2 | `V42_3 | `Latest ]
+  | `Ubuntu of [ `V12_04 | `V14_04 | `V15_04 | `V15_10 | `V16_04 | `V16_10 | `V17_04 | `V17_10 | `LTS | `Latest ]
 ] [@@deriving sexp] 
 (** Supported Docker container distributions *)
 
@@ -122,21 +122,6 @@ val dockerfile_matrix :
   unit -> (t * string * Dockerfile.t) list
 (** [dockerfile_matrix ?pin ()] contains the list of Docker tags
    and their associated Dockerfiles for all distributions.
-   The user of the container can assume that OPAM is installed
-   and initialised to the central remote, and that [opam depext]
-   is available on that container. If [pin] is specified then an
-   [opam pin add <pin>] will be added to the initialisation. *)
-
-val latest_dockerfile_matrix :
-  ?opam_version:string ->
-  ?extra:t list -> 
-  ?pin:string -> unit -> (t * Dockerfile.t) list
-(** [latest_dockerfile_matrix] contains the list of Docker tags
-   and Dockerfiles for the latest releases of distributions.
-   These contain the latest stable version of the distribution,
-   the most recently released version of OCaml, and the freshest
-   version of OPAM supported on that distribution.
-
    The user of the container can assume that OPAM is installed
    and initialised to the central remote, and that [opam depext]
    is available on that container. If [pin] is specified then an
