@@ -33,8 +33,12 @@ type t = [
 ] [@@deriving sexp] 
 (** Supported Docker container distributions *)
 
+val resolve_alias : t -> t
+
 val distros : t list
 (** Enumeration of the supported Docker container distributions *)
+
+val active_distros : t list
 
 val latest_stable_distros : t list
 (** Enumeration of the latest stable (ideally LTS) supported distributions. *)
