@@ -5,14 +5,7 @@ open Astring
 open R.Infix
 module OC = OS.Cmd
 
-(*
-let run ?env c =
-  Logs.info (fun l -> l "exec: %a" Cmd.pp c);
-  OS.Cmd.run ?env c
-*)
-
 let run_out ?env c =
-  Logs.info (fun l -> l "exec: %a" Cmd.pp c);
   let err = OS.Cmd.err_run_out in
   OS.Cmd.run_out ?env ~err c |>
   OS.Cmd.out_lines ~trim:true 
@@ -49,9 +42,53 @@ end
 (** Gnu Parallel *)
 (* parallel --retries 1 --joblog ../logs/joblog.txt --bar --results ../logs docker build --pull --no-cache -f Dockerfile.{} -t opam-{} . ::: ${distros *)
 module Parallel = struct
+
+  module Joblog = struct
+    type ent = {
+      arg: string;
+      seq: int;
+      host: string;
+      start_time: float;
+      run_time: float;
+      send: int;
+      receive: int;
+      exit_code: int;
+      signal: int;
+      command: string;
+    } [@@deriving sexp]
+
+    type t = ent list [@@deriving sexp]
+
+    let of_csv_row row =
+      let find = Csv.Row.find row in
+      let find_int field = find field |> int_of_string in
+      let find_float field = find field |> float_of_string in
+      { arg = "";
+        seq = find_int "Seq";
+        host = find "Host";
+        start_time = find_float "Starttime";
+        run_time = find_float "Runtime";
+        send = find_int "Send";
+        receive = find_int "Receive";
+        exit_code = find_int "Exitval";
+        signal = find_int "Signal";
+        command = find "Command" }
+
+    let find_seq idx t =
+      List.find (fun {seq;_} -> seq = idx) t
+
+    let v file =
+      open_in (Fpath.to_string file) |>
+      Csv.of_channel ~has_header:true ~separator:'\t' ~strip:true |>
+      Csv.Rows.input_all |>
+      List.map of_csv_row
+  end
+
   let bin = Cmd.(v "parallel")
-  let run ?retries ?results ?joblog cmd args =
+
+  let run_cmd ?retries ?results ?joblog cmd args =
     let open Cmd in
+    let args = of_list args in
     let retries =
       match retries with
       | None -> empty
@@ -66,39 +103,19 @@ module Parallel = struct
       | Some r -> v "--results" % p r in
     bin % "--no-notice" %% retries %% joblog %% results %% cmd % ":::" %% args
 
-  module Joblog = struct
-    type ent = {
-      seq: int;
-      host: string;
-      start_time: float;
-      send: int;
-      receive: int;
-      exit_code: int;
-      signal: int;
-      command: string;
-    } [@@deriving sexp]
+  let run ?retries ?results ?joblog cmd args =
+    let open Rresult.R.Infix in
+    let t = run_cmd ?retries ?results ?joblog cmd args in
+    run_out t >>= fun _ ->
+    match joblog with
+    | None -> R.ok []
+    | Some f ->
+       Array.of_list args |> fun args ->
+       Joblog.v f |>
+       List.map (fun j ->
+         let arg = args.(j.Joblog.seq) in
+         { j with arg = arg }) |> R.ok
 
-    type t = ent list [@@deriving sexp]
-
-    let of_csv_row row =
-      let find = Csv.Row.find row in
-      let find_int field = find field |> int_of_string in
-      let find_float field = find field |> float_of_string in
-      { seq = find_int "Seq";
-        host = find "Host";
-        start_time = find_float "Starttime";
-        send = find_int "Send";
-        receive = find_int "Receive";
-        exit_code = find_int "Exitval";
-        signal = find_int "Signal";
-        command = find "Command" }
-
-    let v file =
-      open_in (Fpath.to_string file) |>
-      Csv.of_channel ~has_header:true ~separator:'\t' ~strip:true |>
-      Csv.Rows.input_all |>
-      List.map of_csv_row
-  end
 end
 
 (** Opam *)
