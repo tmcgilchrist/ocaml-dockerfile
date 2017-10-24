@@ -13,7 +13,7 @@ depends: [
   "dockerfile-opam" {>="3.0.0"}
   "cmdliner"
   "fmt"
-  "tty"
+  "logs"
   "bos"
 ]
 build: [
