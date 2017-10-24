@@ -74,9 +74,6 @@ module Parallel = struct
         signal = find_int "Signal";
         command = find "Command" }
 
-    let find_seq idx t =
-      List.find (fun {seq;_} -> seq = idx) t
-
     let v file =
       open_in (Fpath.to_string file) |>
       Csv.of_channel ~has_header:true ~separator:'\t' ~strip:true |>
@@ -113,7 +110,7 @@ module Parallel = struct
        Array.of_list args |> fun args ->
        Joblog.v f |>
        List.map (fun j ->
-         let arg = args.(j.Joblog.seq) in
+         let arg = args.(j.Joblog.seq - 1) in
          { j with arg = arg }) |> R.ok
 
 end
