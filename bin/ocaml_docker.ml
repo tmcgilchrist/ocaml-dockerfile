@@ -87,7 +87,7 @@ let phase1 arch hub_id build_dir logs_dir () =
   let arch_s = match arch with `X86_64 -> "amd64" | `Aarch64 -> "arm64" in
   let gen_tag d = Fmt.strf "%s:linux-%s-opam-%s" hub_id arch_s d in
   let tag = gen_tag "{}" in
-  let cmd = C.Docker.build_cmd ~squash:true ~cache:false ~dockerfile ~tag (Fpath.v ".") in
+  let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag (Fpath.v ".") in
   let args = List.map fst d in
   C.Parallel.run ~retries:1 ~results:logs_dir ~joblog cmd args >>= fun jobs ->
   Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.sexp_of_t jobs)));
