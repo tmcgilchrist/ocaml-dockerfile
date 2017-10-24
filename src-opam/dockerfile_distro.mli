@@ -46,8 +46,7 @@ val distros : t list
 val distro_arches : t -> arch list
 val distro_supported_on : arch -> t -> bool
 val active_distros : t list
-
-val latest_stable_distros : t list
+val latest_distros : t list
 (** Enumeration of the latest stable (ideally LTS) supported distributions. *)
 
 val master_distro : t

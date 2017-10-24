@@ -46,6 +46,7 @@ let distros = [
   `CentOS `V6; `CentOS `V7; `CentOS `Latest;
   `Debian `V9; `Debian `V8; `Debian `V7;
   `Debian `Stable; `Debian `Testing; `Debian `Unstable;
+  `Fedora `V23; `Fedora `V24; `Fedora `V25; `Fedora `V26; `Fedora `Latest;
   `OracleLinux `V7; `OracleLinux `Latest;
   `OpenSUSE `V42_1; `OpenSUSE `V42_2; `OpenSUSE `V42_3; `OpenSUSE `Latest;
   `Ubuntu `V12_04; `Ubuntu `V14_04; `Ubuntu `V15_04; `Ubuntu `V15_10;
@@ -76,18 +77,7 @@ let distro_status (d:t) : status = match d with
   | `Ubuntu `LTS -> `Alias (`Ubuntu `V16_04)
   | `Ubuntu `Latest -> `Alias (`Ubuntu `V17_10)
 
-let distro_arches (d:t) : arch list = match d with
-  | `Debian (`V8 | `V9) -> [ `X86_64; `Aarch64 ]
-  | `Fedora `V26 -> [ `X86_64; `Aarch64 ]
-  | _ -> [ `X86_64 ]
-
-let distro_supported_on (a:arch) (d:t) =
-  List.mem a (distro_arches d)
-
-let active_distros =
-  List.filter (fun d -> distro_status d = `Active) distros
-
-let latest_stable_distros =
+let latest_distros =
   [ `Alpine `Latest; `CentOS `Latest;
     `Debian `Stable; `OracleLinux `Latest;
     `Fedora `Latest; `Ubuntu `Latest; `Ubuntu `LTS ]
@@ -106,6 +96,18 @@ let resolve_alias d =
   match distro_status d with
   | `Alias x -> x
   | _ -> d
+
+let distro_arches (d:t) : arch list =
+  match resolve_alias d with
+  | `Debian (`V8 | `V9) -> [ `X86_64; `Aarch64 ]
+  | `Fedora `V26 -> [ `X86_64; `Aarch64 ]
+  | _ -> [ `X86_64 ]
+
+let distro_supported_on (a:arch) (d:t) =
+  List.mem a (distro_arches d)
+
+let active_distros =
+  List.filter (fun d -> distro_status d = `Active) distros
 
 (* The distro-supplied version of OCaml *)
 let rec builtin_ocaml_of_distro (d:t) : string option =

@@ -1,0 +1,7 @@
+(jbuild_version 1)
+
+(library
+ ((name        dockerfile_cmd)
+  (public_name dockerfile-cmd)
+  (libraries  (dockerfile cmdliner bos fmt.tty logs.cli fmt.cli logs.fmt))
+ ))
