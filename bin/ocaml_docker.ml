@@ -71,6 +71,11 @@ module Phases = struct
 open Rresult
 open R.Infix
 
+let arch_to_docker =
+  function
+  | `X86_64 -> "amd64"
+  | `Aarch64 -> "arm64"
+
 let phase1 arch hub_id build_dir logs_dir () =
   ignore(C.Docker.exists ()); (* TODO rresult *)
   let build_dir = Fpath.v build_dir in
@@ -84,7 +89,7 @@ let phase1 arch hub_id build_dir logs_dir () =
     List.fold_left (fun a -> function Some x -> x::a | None -> a) [] in
   D.generate_dockerfiles ~crunch:false (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
   let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
-  let arch_s = match arch with `X86_64 -> "amd64" | `Aarch64 -> "arm64" in
+  let arch_s = arch_to_docker arch in
   let gen_tag d = Fmt.strf "%s:linux-%s-opam-%s" hub_id arch_s d in
   let tag = gen_tag "{}" in
   let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag (Fpath.v ".") in
@@ -108,17 +113,30 @@ let phase1 arch hub_id build_dir logs_dir () =
   ) jobs;
   R.ok ()
 
-let _ocaml_versions = D.stable_ocaml_versions
+  let phase2 hub_id () =
+    List.iter (fun distro ->
+      let arches = D.distro_arches distro in
+      let platforms = List.map (fun a -> Fmt.strf "linux/%s" (arch_to_docker a)) arches in
+      let template = Fmt.strf "%s:OS-ARCH-opam-%s" hub_id (D.tag_of_distro distro) in
+      let target = Fmt.strf "%s:%s" hub_id (D.tag_of_distro distro) in
+      C.Docker.manifest_push ~platforms ~template ~target |>
+      C.run_out |> R.is_ok |> fun _ -> () (* TODO *)
+    ) D.active_distros;
+    R.ok ()
 end
 
 open Cmdliner
 let setup_logs = C.setup_logs ()
 
+let hub_id =
+  let doc = "Docker Hub user/repo to push to" in
+  Arg.(value & opt string "ocaml/opam2-staging" & info ["hub-id"] ~docv:"HUB_ID" ~doc)
+
+let build_dir = 
+  let doc = "Directory in which to store build artefacts" in
+  Arg.(value & opt file "_build" & info ["b";"build-dir"] ~docv:"BUILD_DIR" ~doc)
+ 
 let phase1_cmd =
-  let hub_id =
-    let doc = "Docker Hub user/repo to push to" in
-    Arg.(value & opt string "ocaml/opam2-staging" & info ["hub-id"] ~docv:"HUB_ID" ~doc)
-  in
   let logs_dir =
     let doc = "Directory in which to store logs" in
     Arg.(value & opt file "_logs" & info ["l";"logs-dir"] ~docv:"LOG_DIR" ~doc)
@@ -128,11 +146,7 @@ let phase1_cmd =
     let term = Arg.enum ["x86_64",`X86_64; "aarch64",`Aarch64] in
     Arg.(value & opt term `X86_64 & info ["arch"] ~docv:"ARCH" ~doc)
   in
-  let build_dir = 
-    let doc = "Directory in which to store build artefacts" in
-    Arg.(value & opt file "_build" & info ["b";"build-dir"] ~docv:"BUILD_DIR" ~doc)
-  in
-  let doc = "generate and build base opam container images" in
+  let doc = "generate, build and push base opam container images" in
   let exits = Term.default_exits in
   let man = [
     `S Manpage.s_description;
@@ -141,12 +155,18 @@ let phase1_cmd =
   Term.(term_result (const Phases.phase1 $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
   Term.info "phase1" ~doc ~sdocs:Manpage.s_common_options ~exits ~man
 
+let phase2_cmd =
+  let doc = "combine opam container images into multiarch versions" in
+  let exits = Term.default_exits in
+  Term.(term_result (const Phases.phase2 $ hub_id $ setup_logs)),
+  Term.info "phase2" ~doc ~exits
+ 
 let default_cmd =
   let doc = "build and push opam and OCaml multiarch container images" in
   let sdocs = Manpage.s_common_options in
   Term.(ret (const (fun _ -> `Help (`Pager, None)) $ pure ())),
   Term.info "obi-docker" ~version:"v1.0.0" ~doc ~sdocs
 
-let cmds = [phase1_cmd]
+let cmds = [phase1_cmd; phase2_cmd]
 let () = Term.(exit @@ eval_choice default_cmd cmds)
  
