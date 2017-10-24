@@ -1,3 +1,4 @@
+open Sexplib.Conv
 open Rresult
 open Bos
 open Astring
@@ -64,6 +65,40 @@ module Parallel = struct
       | None -> empty
       | Some r -> v "--results" % p r in
     bin % "--no-notice" %% retries %% joblog %% results %% cmd % ":::" %% args
+
+  module Joblog = struct
+    type ent = {
+      seq: int;
+      host: string;
+      start_time: float;
+      send: int;
+      receive: int;
+      exit_code: int;
+      signal: int;
+      command: string;
+    } [@@deriving sexp]
+
+    type t = ent list [@@deriving sexp]
+
+    let of_csv_row row =
+      let find = Csv.Row.find row in
+      let find_int field = find field |> int_of_string in
+      let find_float field = find field |> float_of_string in
+      { seq = find_int "Seq";
+        host = find "Host";
+        start_time = find_float "Starttime";
+        send = find_int "Send";
+        receive = find_int "Receive";
+        exit_code = find_int "Exitval";
+        signal = find_int "Signal";
+        command = find "Command" }
+
+    let v file =
+      open_in (Fpath.to_string file) |>
+      Csv.of_channel ~has_header:true ~separator:'\t' ~strip:true |>
+      Csv.Rows.input_all |>
+      List.map of_csv_row
+  end
 end
 
 (** Opam *)
