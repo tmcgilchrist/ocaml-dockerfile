@@ -84,7 +84,7 @@ let phase1 arch hub_id build_dir logs_dir () =
     List.fold_left (fun a -> function Some x -> x::a | None -> a) [] in
   D.generate_dockerfiles ~crunch:false (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
   let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
-  let arch_s = match arch with `X86_64 -> "x86_64" | `Aarch64 -> "aarch64" in
+  let arch_s = match arch with `X86_64 -> "amd64" | `Aarch64 -> "arm64" in
   let gen_tag d = Fmt.strf "%s:linux-%s-opam-%s" hub_id arch_s d in
   let tag = gen_tag "{}" in
   let cmd = C.Docker.build_cmd ~cache:true ~dockerfile ~tag (Fpath.v ".") in
