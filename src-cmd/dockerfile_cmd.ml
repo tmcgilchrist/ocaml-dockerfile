@@ -22,13 +22,14 @@ module Docker = struct
     | true -> Logs.info (fun l -> l "Docker is running"); true
     | false -> Logs.err (fun l -> l "Docker not running"); false
 
-  let build ?(pull=true) ?(cache=true) ?dockerfile ?tag path =
+  let build ?(squash=false) ?(pull=true) ?(cache=true) ?dockerfile ?tag path =
     let open Cmd in
     let cache = if cache then empty else v "--no-cache" in
     let pull = if pull then v "--pull" else empty in
+    let squash = if squash then v "--squash" else empty in
     let dfile = match dockerfile with None -> empty | Some d -> v "-f" % p d in
     let tag = match tag with None -> empty | Some t -> v "-t" % t in
-    bin % "build" %% tag %% cache %% pull %% dfile  % p path
+    bin % "build" %% tag %% cache %% pull %% squash %% dfile  % p path
 
   (* Find the image id that we just built *)
   let build_id log =

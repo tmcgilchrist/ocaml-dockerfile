@@ -92,7 +92,7 @@ let phase1 arch build_dir logs_dir () =
   let args = List.map fst d |> Bos.Cmd.of_list in
   let t = C.Parallel.run ~retries:1 ~results:logs_dir ~joblog cmd args in
   Logs.debug (fun l -> l "cmd: %s" (Bos.Cmd.to_string t));
-  R.ok ()
+  C.run t
 
 let _ocaml_versions = D.stable_ocaml_versions
 end
