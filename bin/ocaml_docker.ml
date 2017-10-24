@@ -60,13 +60,10 @@ let gen_opam_for_distro ?labels d =
         | `V17_10 -> "artful"
         | _ -> assert false in
       Some (Dockerfile_distro.tag_of_distro d, (apt_opam2 ?labels ~distro:"ubuntu" ~tag ()))
-
   | _ -> None
       
 let _ = 
   let _ocaml_versions = Dockerfile_distro.stable_ocaml_versions in
-  let _a36 = apk_opam2 ~distro:"alpine" ~tag:"3.6" () in
-  let u36 = apt_opam2 ~distro:"debian" ~tag:"stable" () in
   let d =
     List.map gen_opam_for_distro Dockerfile_distro.active_distros |>
     List.fold_left (fun a -> function Some x -> x::a | None -> a) []
