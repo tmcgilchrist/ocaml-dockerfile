@@ -90,7 +90,7 @@ let active_distros =
 let latest_stable_distros =
   [ `Alpine `Latest; `CentOS `Latest;
     `Debian `Stable; `OracleLinux `Latest;
-    `Ubuntu `Latest; `Ubuntu `LTS ]
+    `Fedora `Latest; `Ubuntu `Latest; `Ubuntu `LTS ]
 
 let master_distro = `Debian `Stable
 let stable_ocaml_versions =
