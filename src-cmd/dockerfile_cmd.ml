@@ -14,13 +14,14 @@ let run_out ?env c =
 module Docker = struct
   let bin = Cmd.(v "docker")
   let info = Cmd.(bin % "info")
+
   let exists () =
     run_out info |> OC.success |> R.is_ok |>
     function
     | true -> Logs.info (fun l -> l "Docker is running"); true
     | false -> Logs.err (fun l -> l "Docker not running"); false
 
-  let build ?(squash=false) ?(pull=true) ?(cache=true) ?dockerfile ?tag path =
+  let build_cmd ?(squash=false) ?(pull=true) ?(cache=true) ?dockerfile ?tag path =
     let open Cmd in
     let cache = if cache then empty else v "--no-cache" in
     let pull = if pull then v "--pull" else empty in
@@ -28,6 +29,9 @@ module Docker = struct
     let dfile = match dockerfile with None -> empty | Some d -> v "-f" % p d in
     let tag = match tag with None -> empty | Some t -> v "-t" % t in
     bin % "build" %% tag %% cache %% pull %% squash %% dfile  % p path
+
+  let push_cmd tag =
+    Cmd.(bin % "push" % tag)
 
   (* Find the image id that we just built *)
   let build_id log =
@@ -51,7 +55,7 @@ end
 module Parallel = struct
 
   module Joblog = struct
-    type ent = {
+    type t = {
       arg: string;
       seq: int;
       host: string;
@@ -64,8 +68,6 @@ module Parallel = struct
       command: string;
       build_logfiles: (string * string) option;
     } [@@deriving sexp]
-
-    type t = ent list [@@deriving sexp]
 
     let of_csv_row row =
       let find = Csv.Row.find row in
@@ -89,6 +91,8 @@ module Parallel = struct
       List.map of_csv_row
   end
 
+  type joblog = Joblog.t [@@deriving sexp]
+  type t = joblog list [@@deriving sexp]
   let bin = Cmd.(v "parallel")
 
   let run_cmd ?retries ?results ?joblog cmd args =
@@ -126,6 +130,7 @@ module Parallel = struct
                let path = Fmt.strf "%a/1/%s/" Fpath.pp d arg in
                Some (path ^ "stdout", path ^ "stderr") in
          { j with arg; build_logfiles }) |> R.ok
+
 end
 
 (** Opam *)

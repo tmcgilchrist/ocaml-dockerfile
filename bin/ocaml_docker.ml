@@ -71,7 +71,7 @@ module Phases = struct
 open Rresult
 open R.Infix
 
-let phase1 arch build_dir logs_dir () =
+let phase1 arch hub_id build_dir logs_dir () =
   ignore(C.Docker.exists ()); (* TODO rresult *)
   let build_dir = Fpath.v build_dir in
   let logs_dir = Fpath.v logs_dir in
@@ -85,11 +85,12 @@ let phase1 arch build_dir logs_dir () =
   D.generate_dockerfiles ~crunch:false (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
   let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
   let arch_s = match arch with `X86_64 -> "x86_64" | `Aarch64 -> "aarch64" in
-  let tag = Fmt.strf "%s-opam-{}" arch_s in
-  let cmd = C.Docker.build ~cache:true ~dockerfile ~tag (Fpath.v ".") in
+  let gen_tag d = Fmt.strf "%s:linux-%s-opam-%s" hub_id arch_s d in
+  let tag = gen_tag "{}" in
+  let cmd = C.Docker.build_cmd ~cache:true ~dockerfile ~tag (Fpath.v ".") in
   let args = List.map fst d in
   C.Parallel.run ~retries:1 ~results:logs_dir ~joblog cmd args >>= fun jobs ->
-  Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.Joblog.sexp_of_t jobs)));
+  Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.sexp_of_t jobs)));
   List.iter (fun job ->
     match job.C.Parallel.Joblog.build_logfiles with
     | None -> ()
@@ -98,6 +99,12 @@ let phase1 arch build_dir logs_dir () =
         | Ok id ->
             Logs.info (fun l -> l "id %s -> %s" job.C.Parallel.Joblog.arg id);
         | Error _ -> ()
+  ) jobs;
+  (* TODO check jobs all succeeded *)
+  List.iter (fun job ->
+    match C.Docker.push_cmd (gen_tag job.C.Parallel.Joblog.arg) |> C.run_out with
+    | Ok _ -> ()
+    | Error _ -> ()
   ) jobs;
   R.ok ()
 
@@ -108,6 +115,10 @@ open Cmdliner
 let setup_logs = C.setup_logs ()
 
 let phase1_cmd =
+  let hub_id =
+    let doc = "Docker Hub user/repo to push to" in
+    Arg.(value & opt string "ocaml/opam2-staging" & info ["hub-id"] ~docv:"HUB_ID" ~doc)
+  in
   let logs_dir =
     let doc = "Directory in which to store logs" in
     Arg.(value & opt file "_logs" & info ["l";"logs-dir"] ~docv:"LOG_DIR" ~doc)
@@ -127,7 +138,7 @@ let phase1_cmd =
     `S Manpage.s_description;
     `P "Generate and build base $(b,opam) container images." ]
   in
-  Term.(term_result (const Phases.phase1 $ arch $ build_dir $ logs_dir $ setup_logs)),
+  Term.(term_result (const Phases.phase1 $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
   Term.info "phase1" ~doc ~sdocs:Manpage.s_common_options ~exits ~man
 
 let default_cmd =
