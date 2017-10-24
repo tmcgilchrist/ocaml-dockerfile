@@ -34,7 +34,12 @@ type status = [
   | `Deprecated
   | `Active
   | `Alias of t
-]
+] [@@deriving sexp]
+
+type arch = [
+  | `X86_64
+  | `Aarch64
+] [@@deriving sexp]
 
 let distros = [
   `Alpine `V3_3; `Alpine `V3_4; `Alpine `V3_5; `Alpine `V3_6; `Alpine `Latest;
@@ -71,11 +76,20 @@ let distro_status (d:t) : status = match d with
   | `Ubuntu `LTS -> `Alias (`Ubuntu `V16_04)
   | `Ubuntu `Latest -> `Alias (`Ubuntu `V17_10)
 
+let distro_arches (d:t) : arch list = match d with
+  | `Debian (`V8 | `V9) -> [ `X86_64; `Aarch64 ]
+  | `Fedora `V26 -> [ `X86_64; `Aarch64 ]
+  | _ -> [ `X86_64 ]
+
+let distro_supported_on (a:arch) (d:t) =
+  List.mem a (distro_arches d)
+
 let active_distros =
   List.filter (fun d -> distro_status d = `Active) distros
 
 let latest_stable_distros =
-  [ `Alpine `Latest; `CentOS `Latest; `Debian `Stable; `OracleLinux `Latest;
+  [ `Alpine `Latest; `CentOS `Latest;
+    `Debian `Stable; `OracleLinux `Latest;
     `Ubuntu `Latest; `Ubuntu `LTS ]
 
 let master_distro = `Debian `Stable

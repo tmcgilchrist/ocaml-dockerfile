@@ -33,11 +33,18 @@ type t = [
 ] [@@deriving sexp] 
 (** Supported Docker container distributions *)
 
+type arch = [
+  | `X86_64
+  | `Aarch64
+] [@@deriving sexp]
+
 val resolve_alias : t -> t
 
 val distros : t list
 (** Enumeration of the supported Docker container distributions *)
 
+val distro_arches : t -> arch list
+val distro_supported_on : arch -> t -> bool
 val active_distros : t list
 
 val latest_stable_distros : t list
