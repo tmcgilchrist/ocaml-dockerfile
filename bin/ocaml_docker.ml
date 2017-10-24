@@ -84,8 +84,7 @@ let phase1 arch build_dir logs_dir () =
     List.fold_left (fun a -> function Some x -> x::a | None -> a) []
   in
   D.generate_dockerfiles ~crunch:false (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
-  Bos.OS.Dir.set_current build_dir >>= fun () ->
-  let dockerfile = Fpath.v "Dockerfile.{}" in
+  let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
   let arch_s = match arch with `X86_64 -> "x86_64" | `Aarch64 -> "aarch64" in
   let tag = Fmt.strf "%s-opam-{}" arch_s in
   let cmd = C.Docker.build ~cache:false ~dockerfile ~tag (Fpath.v ".") in
