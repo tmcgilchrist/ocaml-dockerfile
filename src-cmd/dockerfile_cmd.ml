@@ -31,16 +31,23 @@ module Docker = struct
 
   (* Find the image id that we just built *)
   let build_id log =
-    match String.find ~rev:true (fun s -> s = '\n') log with
-    | None -> R.error "Failed build"
-    | Some first ->
-        String.with_range ~first log |> fun line ->
-        Logs.debug (fun l -> l "last log line: %s" line);
-        R.ok line 
+    let rec find_id =
+      function
+      | hd::tl when String.is_prefix ~affix:"Successfully tagged " hd -> find_id tl
+      | hd::tl when String.is_prefix ~affix:"Successfully built " hd -> begin
+         match String.cut ~sep:"Successfully built " hd with
+         | Some ("", id) -> R.ok id
+         | Some _ -> R.error_msg "Unexpected internal error in build_id"
+         | None -> R.error_msg "Malformed successfully built log"
+      end
+      | hd::tl -> R.error_msg "Unexpected lines at end of log"
+      | [] -> R.error_msg "Unable to find container id in log" in
+    OS.File.read_lines log >>= fun lines ->
+    List.rev lines |> fun lines ->
+    find_id lines
 end
 
 (** Gnu Parallel *)
-(* parallel --retries 1 --joblog ../logs/joblog.txt --bar --results ../logs docker build --pull --no-cache -f Dockerfile.{} -t opam-{} . ::: ${distros *)
 module Parallel = struct
 
   module Joblog = struct
@@ -119,7 +126,6 @@ module Parallel = struct
                let path = Fmt.strf "%a/1/%s/" Fpath.pp d arg in
                Some (path ^ "stdout", path ^ "stderr") in
          { j with arg; build_logfiles }) |> R.ok
-
 end
 
 (** Opam *)

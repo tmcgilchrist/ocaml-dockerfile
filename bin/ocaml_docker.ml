@@ -90,6 +90,15 @@ let phase1 arch build_dir logs_dir () =
   let args = List.map fst d in
   C.Parallel.run ~retries:1 ~results:logs_dir ~joblog cmd args >>= fun jobs ->
   Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.Joblog.sexp_of_t jobs)));
+  List.iter (fun job ->
+    match job.C.Parallel.Joblog.build_logfiles with
+    | None -> ()
+    | Some (stdout,_) ->
+        match C.Docker.build_id (Fpath.v stdout) with
+        | Ok id ->
+            Logs.info (fun l -> l "id %s -> %s" job.C.Parallel.Joblog.arg id);
+        | Error _ -> ()
+  ) jobs;
   R.ok ()
 
 let _ocaml_versions = D.stable_ocaml_versions
