@@ -55,6 +55,7 @@ module Parallel = struct
       exit_code: int;
       signal: int;
       command: string;
+      build_logfiles: (string * string) option;
     } [@@deriving sexp]
 
     type t = ent list [@@deriving sexp]
@@ -63,7 +64,7 @@ module Parallel = struct
       let find = Csv.Row.find row in
       let find_int field = find field |> int_of_string in
       let find_float field = find field |> float_of_string in
-      { arg = "";
+      { arg = ""; build_logfiles = None;
         seq = find_int "Seq";
         host = find "Host";
         start_time = find_float "Starttime";
@@ -111,7 +112,13 @@ module Parallel = struct
        Joblog.v f |>
        List.map (fun j ->
          let arg = args.(j.Joblog.seq - 1) in
-         { j with arg = arg }) |> R.ok
+         let build_logfiles =
+           match results with
+           | None -> None
+           | Some d ->
+               let path = Fmt.strf "%a/1/%s/" Fpath.pp d arg in
+               Some (path ^ "stdout", path ^ "stderr") in
+         { j with arg; build_logfiles }) |> R.ok
 
 end
 
