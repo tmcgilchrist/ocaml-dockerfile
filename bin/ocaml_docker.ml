@@ -86,7 +86,7 @@ let phase1 arch build_dir logs_dir () =
   let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
   let arch_s = match arch with `X86_64 -> "x86_64" | `Aarch64 -> "aarch64" in
   let tag = Fmt.strf "%s-opam-{}" arch_s in
-  let cmd = C.Docker.build ~cache:false ~dockerfile ~tag (Fpath.v ".") in
+  let cmd = C.Docker.build ~cache:true ~dockerfile ~tag (Fpath.v ".") in
   let args = List.map fst d |> Bos.Cmd.of_list in
   let t = C.Parallel.run ~retries:1 ~results:logs_dir ~joblog cmd args in
   Logs.debug (fun l -> l "cmd: %s" (Bos.Cmd.to_string t));
