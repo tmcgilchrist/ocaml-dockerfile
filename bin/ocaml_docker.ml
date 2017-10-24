@@ -81,8 +81,7 @@ let phase1 arch build_dir logs_dir () =
   let d =
     List.filter (D.distro_supported_on arch) D.active_distros |>
     List.map Gen.gen_opam_for_distro |>
-    List.fold_left (fun a -> function Some x -> x::a | None -> a) []
-  in
+    List.fold_left (fun a -> function Some x -> x::a | None -> a) [] in
   D.generate_dockerfiles ~crunch:false (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
   let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
   let arch_s = match arch with `X86_64 -> "x86_64" | `Aarch64 -> "aarch64" in
@@ -91,7 +90,7 @@ let phase1 arch build_dir logs_dir () =
   let args = List.map fst d |> Bos.Cmd.of_list in
   let t = C.Parallel.run ~retries:1 ~results:logs_dir ~joblog cmd args in
   Logs.debug (fun l -> l "cmd: %s" (Bos.Cmd.to_string t));
-  C.run t
+  C.run_out t
 
 let _ocaml_versions = D.stable_ocaml_versions
 end

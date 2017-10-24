@@ -4,20 +4,24 @@ open Astring
 open R.Infix
 module OC = OS.Cmd
 
+(*
 let run ?env c =
   Logs.info (fun l -> l "exec: %a" Cmd.pp c);
   OS.Cmd.run ?env c
+*)
 
 let run_out ?env c =
   Logs.info (fun l -> l "exec: %a" Cmd.pp c);
-  OS.Cmd.run_out ?env c
+  let err = OS.Cmd.err_run_out in
+  OS.Cmd.run_out ?env ~err c |>
+  OS.Cmd.out_lines ~trim:true 
 
 (** Docker *)
 module Docker = struct
   let bin = Cmd.(v "docker")
   let info = Cmd.(bin % "info")
   let exists () =
-    run_out info |> OC.out_string |> OC.success |> R.is_ok |>
+    run_out info |> OC.success |> R.is_ok |>
     function
     | true -> Logs.info (fun l -> l "Docker is running"); true
     | false -> Logs.err (fun l -> l "Docker not running"); false
