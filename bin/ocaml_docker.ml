@@ -19,8 +19,10 @@ let apk_opam2 ?(labels=[]) ~distro ~tag () =
   label (("distro_style", "apk")::labels) @@
   L.Apk.install "build-base bzip2 git tar curl ca-certificates" @@
   install_opam_from_source ~install_wrappers:true ~branch:"master" () @@
+  run "strip /usr/local/bin/opam*" @@
   from ~tag distro @@
-  copy ~from:"0" ~src:["/usr/local/bin/opam*"] ~dst:"/usr/bin" () @@
+  copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
+  copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
   L.Apk.install "build-base tar ca-certificates git rsync curl sudo" @@ 
   L.Apk.add_user ~sudo:true "opam" @@
   L.Git.init ()
@@ -31,10 +33,20 @@ let apt_opam2 ?(labels=[]) ~distro ~tag () =
   label (("distro_style", "apt")::labels) @@
   L.Apt.install "build-essential curl git" @@
   install_opam_from_source ~install_wrappers:true ~branch:"master" () @@
+  run "strip /usr/local/bin/opam*" @@
   from ~tag distro @@
-  copy ~from:"0" ~src:["/usr/local/bin/opam*"] ~dst:"/usr/bin" () @@
+  copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
+  copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
   L.Apt.install "build-essential curl git rsync sudo unzip" @@
   L.Git.init ()
+
+(* Generate archive mirror *)
+let opam2_mirror (hub_id:string) =
+  header hub_id "alpine-3.6" @@
+  run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository" @@
+  workdir "/home/opam/opam-repository" @@
+  run "opam admin upgrade" @@
+  run "opam admin cache"
 
 let gen_opam_for_distro ?labels d =
   match D.resolve_alias d with
@@ -123,6 +135,15 @@ let phase1 arch hub_id build_dir logs_dir () =
       C.run_out |> R.is_ok |> fun _ -> () (* TODO *)
     ) D.active_distros;
     R.ok ()
+
+  let phase3 hub_id build_dir () =
+    let d = Gen.opam2_mirror hub_id in 
+    let build_dir = Fpath.(v build_dir / "archive") in
+    Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
+    D.generate_dockerfile ~crunch:false (Fpath.to_string build_dir) d;
+    Bos.OS.Dir.set_current build_dir >>= fun () -> 
+    (C.Docker.build_cmd ~cache:false ~tag:"opam2-archive" (Fpath.v ".") |> C.run_out) >>= fun _ ->
+    R.ok ()
 end
 
 open Cmdliner
@@ -160,13 +181,19 @@ let phase2_cmd =
   let exits = Term.default_exits in
   Term.(term_result (const Phases.phase2 $ hub_id $ setup_logs)),
   Term.info "phase2" ~doc ~exits
- 
+
+let phase3_cmd =
+  let doc = "generate a distribution archive mirror" in
+  let exits = Term.default_exits in
+  Term.(term_result (const Phases.phase3 $ hub_id $ build_dir $ setup_logs)),
+  Term.info "phase3-cache" ~doc ~exits
+  
 let default_cmd =
   let doc = "build and push opam and OCaml multiarch container images" in
   let sdocs = Manpage.s_common_options in
   Term.(ret (const (fun _ -> `Help (`Pager, None)) $ pure ())),
   Term.info "obi-docker" ~version:"v1.0.0" ~doc ~sdocs
 
-let cmds = [phase1_cmd; phase2_cmd]
+let cmds = [phase1_cmd; phase2_cmd; phase3_cmd]
 let () = Term.(exit @@ eval_choice default_cmd cmds)
  
