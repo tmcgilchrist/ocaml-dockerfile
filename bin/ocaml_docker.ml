@@ -53,7 +53,7 @@ module Gen = struct
 
   let ocaml_compilers hub_id distro =
     let distro = D.tag_of_distro distro in
-    let compilers = D.stable_ocaml_versions |> List.map (run "opam switch %s") |> (@@@) empty in
+    let compilers = D.stable_ocaml_versions |> List.map (run "opam switch create %s") |> (@@@) empty in
     let d = 
       header hub_id distro @@
       run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
