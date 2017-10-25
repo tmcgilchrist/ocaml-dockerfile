@@ -44,7 +44,7 @@ module Gen = struct
   let opam2_mirror (hub_id:string) =
     header hub_id "alpine-3.6" @@
     run "sudo apk add --update bash m4" @@
-    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository" @@
+    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
     workdir "/home/opam/opam-repository" @@
     run "opam admin upgrade" @@
     run "opam admin cache" @@
@@ -56,7 +56,7 @@ module Gen = struct
     let compilers = D.stable_ocaml_versions |> List.map (run "opam switch %s") |> (@@@) empty in
     let d = 
       header hub_id distro @@
-      run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository" @@
+      run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
       run "opam init -a /home/opam/opam-repository" @@
       compilers @@
       run "opam switch system" in
