@@ -54,8 +54,6 @@ module Docker = struct
     let platforms = String.concat ~sep:"," platforms in
     Cmd.(v "manifest-tool" % "push" % "from-args" % "--platforms" % platforms
          % "--template" % template % "--target" % target)
-(*
- manifest-tool push from-args --platforms linux/amd64,linux/arm64 --template ocaml/opam2-staging:OS-ARCH-opam-debian-8 --target ocaml/opam2-staging:opam-debian-8 *)
 end
 
 (** Gnu Parallel *)
