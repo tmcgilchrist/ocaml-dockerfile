@@ -43,7 +43,7 @@ let apt_opam2 ?(labels=[]) ~distro ~tag () =
 (* Generate archive mirror *)
 let opam2_mirror (hub_id:string) =
   header hub_id "alpine-3.6" @@
-  L.Apk.install "m4 bash" @@
+  run "sudo apk add --update bash m4" @@
   run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository" @@
   workdir "/home/opam/opam-repository" @@
   run "opam admin upgrade" @@
