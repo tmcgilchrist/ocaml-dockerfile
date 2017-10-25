@@ -59,7 +59,7 @@ module Gen = struct
       run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
       run "opam init -a /home/opam/opam-repository" @@
       compilers @@
-      run "opam switch system" in
+      run "opam switch default" in
     distro, d
 
   let gen_opam_for_distro ?labels d =
