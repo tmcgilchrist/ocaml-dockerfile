@@ -43,10 +43,13 @@ let apt_opam2 ?(labels=[]) ~distro ~tag () =
 (* Generate archive mirror *)
 let opam2_mirror (hub_id:string) =
   header hub_id "alpine-3.6" @@
+  L.Apk.install "m4 bash" @@
   run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository" @@
   workdir "/home/opam/opam-repository" @@
   run "opam admin upgrade" @@
-  run "opam admin cache"
+  run "opam admin cache" @@
+  run "opam init -a /home/opam/opam-repository" @@
+  run "opam install -yj4 cohttp-lwt-unix"
 
 let gen_opam_for_distro ?labels d =
   match D.resolve_alias d with
