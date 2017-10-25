@@ -51,11 +51,11 @@ module Gen = struct
     run "opam init -a /home/opam/opam-repository" @@
     run "opam install -yj4 cohttp-lwt-unix"
 
-  let ocaml_compilers distro =
+  let ocaml_compilers hub_id distro =
     let distro = D.tag_of_distro distro in
     let compilers = D.stable_ocaml_versions |> List.map (run "opam switch %s") |> (@@@) empty in
     let d = 
-      header distro "latest" @@
+      header hub_id distro @@
       run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository" @@
       run "opam init -a /home/opam/opam-repository" @@
       compilers @@
@@ -167,7 +167,7 @@ module Phases = struct
     let joblog = Fpath.(logs_dir / "joblog.txt") in
     Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
     Bos.OS.Dir.create ~path:true logs_dir >>= fun _ ->
-    let d = List.filter (D.distro_supported_on arch) D.active_distros |> List.map Gen.ocaml_compilers in
+    let d = List.filter (D.distro_supported_on arch) D.active_distros |> List.map (Gen.ocaml_compilers hub_id) in
     D.generate_dockerfiles ~crunch:false (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let arch_s = arch_to_docker arch in
@@ -178,11 +178,12 @@ module Phases = struct
     C.Parallel.run ~retries:1 ~results:logs_dir ~joblog cmd args >>= fun jobs ->
     Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.sexp_of_t jobs)));
     (* TODO check jobs all succeeded *)
+(*
     List.iter (fun job ->
         match C.Docker.push_cmd (gen_tag job.C.Parallel.Joblog.arg) |> C.run_out with
         | Ok _ -> ()
         | Error _ -> ()
-      ) jobs;
+      ) jobs; *)
     R.ok ()
 
 end
