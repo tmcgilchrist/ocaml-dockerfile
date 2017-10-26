@@ -109,7 +109,8 @@ let ocaml_arches ov : arch list =
   match ov with
   | "4.00.1" | "4.01.0" | "4.02.3" ->
      [ `X86_64 ]
-  | "4.04.0" | "4.04.1" | "4.04.2"| "4.04.2+flambda"
+  | "4.03.0" | "4.03.0+flambda"
+  | "4.04.0" | "4.04.1" | "4.04.2" | "4.04.2+flambda"
   | "4.05.0" | "4.05.0+flambda" | "4.06.0" | "4.06.0+flambda" ->
      [ `X86_64; `Aarch64 ]
   | _ -> failwith "unknown ocaml version for ocaml_arches"
