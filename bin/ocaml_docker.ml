@@ -51,9 +51,9 @@ module Gen = struct
     run "opam init -a /home/opam/opam-repository" @@
     run "opam install -yj4 cohttp-lwt-unix"
 
-  let ocaml_compilers hub_id distro =
+  let ocaml_compilers hub_id arch distro =
     let distro = D.tag_of_distro distro in
-    let compilers = D.stable_ocaml_versions |> List.map (run "opam switch create %s") |> (@@@) empty in
+    let compilers = D.stable_ocaml_versions |> List.filter (D.ocaml_supported_on arch) |> List.map (run "opam switch create %s") |> (@@@) empty in
     let d = 
       header hub_id distro @@
       run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
@@ -155,7 +155,7 @@ module Phases = struct
     let build_dir = Fpath.(v build_dir / "archive") in
     let _logs_dir = Fpath.v logs_dir in
     Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
-    D.generate_dockerfile ~crunch:false (Fpath.to_string build_dir) d;
+    D.generate_dockerfile ~crunch:true (Fpath.to_string build_dir) d;
     Bos.OS.Dir.set_current build_dir >>= fun () -> 
     (C.Docker.build_cmd ~cache:false ~tag:"opam2-archive" (Fpath.v ".") |> C.run_out) >>= fun _ ->
     R.ok ()
@@ -167,8 +167,8 @@ module Phases = struct
     let joblog = Fpath.(logs_dir / "joblog.txt") in
     Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
     Bos.OS.Dir.create ~path:true logs_dir >>= fun _ ->
-    let d = List.filter (D.distro_supported_on arch) D.active_distros |> List.map (Gen.ocaml_compilers hub_id) in
-    D.generate_dockerfiles ~crunch:false (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
+    let d = List.filter (D.distro_supported_on arch) D.active_distros |> List.map (Gen.ocaml_compilers hub_id arch) in
+    D.generate_dockerfiles ~crunch:true (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let arch_s = arch_to_docker arch in
     let gen_tag d = Fmt.strf "%s:linux-%s-ocaml-%s" hub_id arch_s d in
@@ -178,12 +178,6 @@ module Phases = struct
     C.Parallel.run ~retries:1 ~results:logs_dir ~joblog cmd args >>= fun jobs ->
     Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.sexp_of_t jobs)));
     (* TODO check jobs all succeeded *)
-(*
-    List.iter (fun job ->
-        match C.Docker.push_cmd (gen_tag job.C.Parallel.Joblog.arg) |> C.run_out with
-        | Ok _ -> ()
-        | Error _ -> ()
-      ) jobs; *)
     R.ok ()
 
 end

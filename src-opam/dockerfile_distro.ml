@@ -83,9 +83,11 @@ let latest_distros =
     `Fedora `Latest; `Ubuntu `Latest; `Ubuntu `LTS ]
 
 let master_distro = `Debian `Stable
+
 let stable_ocaml_versions =
   [ "4.00.1"; "4.01.0"; "4.02.3"; "4.03.0"; "4.03.0+flambda";
     "4.04.0"; "4.04.1"; "4.04.2"; "4.04.2+flambda"; "4.05.0"; "4.05.0+flambda" ]
+
 let dev_ocaml_versions = [ "4.06.0"; "4.06.0+flambda" ]
 let all_ocaml_versions = stable_ocaml_versions @ dev_ocaml_versions
 let latest_ocaml_version = "4.04.2"
@@ -102,6 +104,18 @@ let distro_arches (d:t) : arch list =
   | `Debian (`V8 | `V9) -> [ `X86_64; `Aarch64 ]
   | `Fedora `V26 -> [ `X86_64; `Aarch64 ]
   | _ -> [ `X86_64 ]
+
+let ocaml_arches ov : arch list =
+  match ov with
+  | "4.00.1" | "4.01.0" | "4.02.3" ->
+     [ `X86_64 ]
+  | "4.04.0" | "4.04.1" | "4.04.2"| "4.04.2+flambda"
+  | "4.05.0" | "4.05.0+flambda" | "4.06.0" | "4.06.0+flambda" ->
+     [ `X86_64; `Aarch64 ]
+  | _ -> failwith "unknown ocaml version for ocaml_arches"
+
+let ocaml_supported_on (a:arch) ov =
+  List.mem a (ocaml_arches ov)
 
 let distro_supported_on (a:arch) (d:t) =
   List.mem a (distro_arches d)
