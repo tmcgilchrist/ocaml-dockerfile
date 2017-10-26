@@ -48,6 +48,7 @@ val ocaml_arches : string -> arch list
 val distro_supported_on : arch -> t -> bool
 val ocaml_supported_on : arch -> string -> bool
 val active_distros : t list
+val inactive_distros : t list
 val latest_distros : t list
 (** Enumeration of the latest stable (ideally LTS) supported distributions. *)
 

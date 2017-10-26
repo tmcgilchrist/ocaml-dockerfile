@@ -124,6 +124,9 @@ let distro_supported_on (a:arch) (d:t) =
 let active_distros =
   List.filter (fun d -> distro_status d = `Active) distros
 
+let inactive_distros =
+  List.filter (fun d -> distro_status d = `Deprecated) distros
+
 (* The distro-supplied version of OCaml *)
 let rec builtin_ocaml_of_distro (d:t) : string option =
   match resolve_alias d with
