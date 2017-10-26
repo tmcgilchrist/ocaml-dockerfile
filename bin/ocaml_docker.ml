@@ -2,6 +2,7 @@
 module L = Dockerfile_linux
 module D = Dockerfile_distro
 module C = Dockerfile_cmd
+module G = Dockerfile_gen
 
 module Gen = struct
   open Dockerfile
@@ -113,7 +114,7 @@ module Phases = struct
       List.filter (D.distro_supported_on arch) D.active_distros |>
       List.map Gen.gen_opam_for_distro |>
       List.fold_left (fun a -> function Some x -> x::a | None -> a) [] in
-    D.generate_dockerfiles ~crunch:false (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
+    G.generate_dockerfiles ~crunch:false (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let arch_s = arch_to_docker arch in
     let gen_tag d = Fmt.strf "%s:linux-%s-opam-%s" hub_id arch_s d in
@@ -155,7 +156,7 @@ module Phases = struct
     let build_dir = Fpath.(v build_dir / "archive") in
     let _logs_dir = Fpath.v logs_dir in
     Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
-    D.generate_dockerfile ~crunch:true (Fpath.to_string build_dir) d;
+    G.generate_dockerfile ~crunch:true (Fpath.to_string build_dir) d;
     Bos.OS.Dir.set_current build_dir >>= fun () -> 
     (C.Docker.build_cmd ~cache:false ~tag:"opam2-archive" (Fpath.v ".") |> C.run_out) >>= fun _ ->
     R.ok ()
@@ -168,7 +169,7 @@ module Phases = struct
     Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
     Bos.OS.Dir.create ~path:true logs_dir >>= fun _ ->
     let d = List.filter (D.distro_supported_on arch) D.active_distros |> List.map (Gen.ocaml_compilers hub_id arch) in
-    D.generate_dockerfiles ~crunch:true (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
+    G.generate_dockerfiles ~crunch:true (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let arch_s = arch_to_docker arch in
     let gen_tag d = Fmt.strf "%s:linux-%s-ocaml-%s" hub_id arch_s d in
