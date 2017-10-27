@@ -42,6 +42,32 @@ module Gen = struct
     L.Apt.install "build-essential curl git rsync sudo unzip" @@
     L.Git.init ()
 
+  (* RPM based Dockerfile *)
+  let yum_opam2 ?(labels=[]) ~distro ~tag () =
+    header distro tag @@
+    label (("distro_style", "apt")::labels) @@
+    L.RPM.dev_packages ~extra:"which tar curl xz" () @@
+    install_opam_from_source ~install_wrappers:true ~branch:"master" () @@
+    run "strip /usr/local/bin/opam" @@
+    from ~tag distro @@
+    copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
+    copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
+    L.RPM.add_user ~sudo:true "opam" @@ (** TODO pin uid at 1000 *)
+    L.Git.init ()
+
+  (* Zypper based Dockerfile *)
+  let zypper_opam2 ?(labels=[]) ~distro ~tag () =
+    header distro tag @@
+    label (("distro_style", "zypper")::labels) @@
+    L.Zypper.dev_packages () @@
+    install_opam_from_source ~install_wrappers:true ~branch:"master" () @@
+    run "strip /usr/local/bin/opam" @@
+    from ~tag distro @@
+    copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
+    copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
+    L.Zypper.add_user ~sudo:true "opam" @@
+    L.Git.init ()
+
   (* Generate archive mirror *)
   let opam2_mirror (hub_id:string) =
     header hub_id "alpine-3.6" @@
@@ -71,7 +97,7 @@ module Gen = struct
         | `V3_3 -> "3.3" | `V3_4 -> "3.4"
         | `V3_5 -> "3.5" | `V3_6 -> "3.6"
         | `Latest -> assert false in
-      Some (D.tag_of_distro d, (apk_opam2 ?labels ~distro:"alpine" ~tag ()))
+      D.tag_of_distro d, (apk_opam2 ?labels ~distro:"alpine" ~tag ())
     | `Debian v ->
       let tag = match v with
         | `V7 -> "7"
@@ -80,7 +106,7 @@ module Gen = struct
         | `Testing -> "testing"
         | `Unstable -> "unstable"
         | `Stable -> assert false in
-      Some (D.tag_of_distro d, (apt_opam2 ?labels ~distro:"debian" ~tag ()))
+      D.tag_of_distro d, (apt_opam2 ?labels ~distro:"debian" ~tag ())
     | `Ubuntu v ->
       let tag = match v with
         | `V12_04 -> "precise"
@@ -90,8 +116,29 @@ module Gen = struct
         | `V17_04 -> "zesty"
         | `V17_10 -> "artful"
         | _ -> assert false in
-      Some (D.tag_of_distro d, (apt_opam2 ?labels ~distro:"ubuntu" ~tag ()))
-    | _ -> None
+      D.tag_of_distro d, (apt_opam2 ?labels ~distro:"ubuntu" ~tag ())
+   | `CentOS v ->
+      let tag = match v with
+        | `V6 -> "6"
+        | `V7 -> "7"
+        | _ -> assert false in
+      D.tag_of_distro d, (yum_opam2 ?labels ~distro:"centos" ~tag ())
+   | `Fedora v ->
+      let tag = match v with
+        | `V21 -> "21" | `V22 -> "22" | `V23 -> "23" | `V24 -> "24"
+        | `V25 -> "25" | `V26 -> "26"
+        | _ -> assert false in
+      D.tag_of_distro d, (yum_opam2 ?labels ~distro:"fedora" ~tag ())
+   | `OracleLinux v ->
+      let tag = match v with
+        | `V7 -> "7" 
+        | _ -> assert false in
+      D.tag_of_distro d, (yum_opam2 ?labels ~distro:"oraclelinux" ~tag ())
+   | `OpenSUSE v ->
+      let tag = match v with
+        | `V42_1 -> "42.1"  | `V42_2 -> "42.2" | `V42_3 -> "42.3"
+        | _ -> assert false in
+      D.tag_of_distro d, (zypper_opam2 ?labels ~distro:"opensuse" ~tag ())
 end
 
 module Phases = struct
@@ -116,8 +163,7 @@ module Phases = struct
     let gen_tag = Fmt.strf "%s:linux-%s-opam-%s" hub_id (arch_to_docker arch) in
     setup_log_dirs ~prefix:"phase1" build_dir logs_dir @@ fun build_dir logs_dir ->
     List.filter (D.distro_supported_on arch) D.active_distros |>
-    List.map Gen.gen_opam_for_distro |>
-    List.fold_left (fun a -> function Some x -> x::a | None -> a) [] |> fun ds ->
+    List.map Gen.gen_opam_for_distro |> fun ds ->
     G.generate_dockerfiles ~crunch:true build_dir ds >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
