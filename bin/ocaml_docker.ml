@@ -104,19 +104,16 @@ module Phases = struct
     | `X86_64 -> "amd64"
     | `Aarch64 -> "arm64"
 
-  let with_log_dirs build_dir logs_dir fn =
-    let build_dir = Fpath.v build_dir in
-    let logs_dir = Fpath.v logs_dir in
+  let setup_log_dirs build_dir logs_dir =
     Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
-    Bos.OS.Dir.create ~path:true logs_dir >>= fun _ ->
-    fn build_dir logs_dir
+    Bos.OS.Dir.create ~path:true logs_dir >>= fun _ -> Ok ()
 
+  (* Generate base opam binaries for all distros *)
   let phase1 arch hub_id build_dir logs_dir () =
-    with_log_dirs build_dir logs_dir (fun build_dir logs_dir ->
-    let d =
-      List.filter (D.distro_supported_on arch) D.active_distros |>
-      List.map Gen.gen_opam_for_distro |>
-      List.fold_left (fun a -> function Some x -> x::a | None -> a) [] in
+    setup_log_dirs build_dir logs_dir >>= fun () ->
+    List.filter (D.distro_supported_on arch) D.active_distros |>
+    List.map Gen.gen_opam_for_distro |>
+    List.fold_left (fun a -> function Some x -> x::a | None -> a) [] |> fun d ->
     G.generate_dockerfiles ~crunch:false build_dir d >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let arch_s = arch_to_docker arch in
@@ -131,7 +128,6 @@ module Phases = struct
       C.Docker.push_cmd |>
       CU.run_out >>= fun _ -> Ok ()
     ) jobs
-    )
 
   let phase2 hub_id () =
     List.iter (fun distro ->
@@ -146,8 +142,7 @@ module Phases = struct
 
   let phase3_archive hub_id build_dir logs_dir () =
     let d = Gen.opam2_mirror hub_id in 
-    let build_dir = Fpath.(v build_dir / "archive") in
-    let _logs_dir = Fpath.v logs_dir in
+    let build_dir = Fpath.(build_dir / "archive") in
     Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
     G.generate_dockerfile ~crunch:true build_dir d >>= fun () ->
     Bos.OS.Dir.set_current build_dir >>= fun () -> 
@@ -155,7 +150,7 @@ module Phases = struct
     R.ok ()
 
   let phase3_megaocaml arch hub_id build_dir logs_dir () =
-    with_log_dirs build_dir logs_dir (fun build_dir logs_dir ->
+    setup_log_dirs build_dir logs_dir >>= fun () ->
     let d =
       List.filter (D.distro_supported_on arch) D.active_distros |>
       List.map (Gen.ocaml_compilers hub_id arch) in
@@ -167,10 +162,9 @@ module Phases = struct
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst d in
     C.Parallel.run ~retries:1 ~results:logs_dir cmd args >>= fun _ -> Ok ()
-    )
 
   let phase3_ocaml arch hub_id build_dir logs_dir () =
-    with_log_dirs build_dir logs_dir (fun build_dir logs_dir ->
+    setup_log_dirs build_dir logs_dir >>= fun () ->
     let d =
       List.filter (D.distro_supported_on arch) D.active_distros |>
       List.map (Gen.ocaml_compilers hub_id arch) in
@@ -182,8 +176,6 @@ module Phases = struct
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst d in
     C.Parallel.run ~retries:1 ~results:logs_dir cmd args >>= fun _ -> Ok ()
-    )
-
 
 end
 
@@ -194,13 +186,16 @@ let hub_id =
   let doc = "Docker Hub user/repo to push to" in
   Arg.(value & opt string "ocaml/opam2-staging" & info ["hub-id"] ~docv:"HUB_ID" ~doc)
 
+let fpath =
+  Arg.conv ~docv:"PATH" (Fpath.of_string,Fpath.pp)
+
 let build_dir = 
   let doc = "Directory in which to store build artefacts" in
-  Arg.(value & opt file "_build" & info ["b";"build-dir"] ~docv:"BUILD_DIR" ~doc)
+  Arg.(value & opt fpath (Fpath.v "_build") & info ["b";"build-dir"] ~docv:"BUILD_DIR" ~doc)
 
 let logs_dir =
   let doc = "Directory in which to store logs" in
-  Arg.(value & opt file "_logs" & info ["l";"logs-dir"] ~docv:"LOG_DIR" ~doc)
+  Arg.(value & opt fpath (Fpath.v "_logs") & info ["l";"logs-dir"] ~docv:"LOG_DIR" ~doc)
 
 let arch =
   let doc = "CPU architecture to perform build on" in
