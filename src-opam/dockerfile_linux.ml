@@ -55,7 +55,7 @@ module RPM = struct
     run "chmod 700 .ssh"
 
   let dev_packages ?extra () =
-    install "sudo passwd bzip2 patch nano git%s" (match extra with None -> "" | Some x -> " " ^ x) @@
+    install "sudo passwd bzip2 patch nano gcc-c++ git%s" (match extra with None -> "" | Some x -> " " ^ x) @@
     groupinstall "\"Development Tools\""
 
   let install_system_ocaml =
