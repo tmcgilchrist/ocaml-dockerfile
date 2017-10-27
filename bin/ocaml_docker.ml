@@ -48,6 +48,7 @@ module Gen = struct
     L.RPM.dev_packages ~extra:"which tar curl xz" () @@
     install_opam_from_source ~prefix:"/usr" ~install_wrappers:true ~branch:"master" () @@
     from ~tag distro @@
+    L.RPM.dev_packages ~extra:"which tar curl xz" () @@
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.RPM.add_user ~sudo:true "opam" @@ (** TODO pin uid at 1000 *)
@@ -60,6 +61,7 @@ module Gen = struct
     L.Zypper.dev_packages () @@
     install_opam_from_source ~prefix:"/usr" ~install_wrappers:true ~branch:"master" () @@
     from ~tag distro @@
+    L.Zypper.dev_packages () @@
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.Zypper.add_user ~sudo:true "opam" @@
@@ -161,7 +163,7 @@ module Phases = struct
     setup_log_dirs ~prefix:"phase1" build_dir logs_dir @@ fun build_dir logs_dir ->
     List.filter (D.distro_supported_on arch) D.active_distros |>
     List.map Gen.gen_opam_for_distro |> fun ds ->
-    G.generate_dockerfiles ~crunch:false build_dir ds >>= fun () ->
+    G.generate_dockerfiles ~crunch:true build_dir ds >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     C.Parallel.run ~retries:1 ~results:logs_dir cmd (List.map fst ds) >>= fun jobs ->
