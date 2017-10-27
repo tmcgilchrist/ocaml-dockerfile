@@ -1,0 +1,7 @@
+(jbuild_version 1)
+
+(library
+ ((name        dockerfile_gen)
+  (public_name dockerfile-gen)
+  (libraries  (dockerfile dockerfile-cmd bos fmt.tty logs.cli logs.fmt))
+ ))

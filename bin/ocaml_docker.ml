@@ -2,6 +2,7 @@
 module L = Dockerfile_linux
 module D = Dockerfile_distro
 module C = Dockerfile_cmd
+module CU = Dockerfile_cmd.Utils
 module G = Dockerfile_gen
 
 module Gen = struct
@@ -103,42 +104,34 @@ module Phases = struct
     | `X86_64 -> "amd64"
     | `Aarch64 -> "arm64"
 
-  let phase1 arch hub_id build_dir logs_dir () =
-    ignore(C.Docker.exists ()); (* TODO rresult *)
+  let with_log_dirs build_dir logs_dir fn =
     let build_dir = Fpath.v build_dir in
     let logs_dir = Fpath.v logs_dir in
-    let joblog = Fpath.(logs_dir / "joblog.txt") in
     Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
     Bos.OS.Dir.create ~path:true logs_dir >>= fun _ ->
+    fn build_dir logs_dir
+
+  let phase1 arch hub_id build_dir logs_dir () =
+    with_log_dirs build_dir logs_dir (fun build_dir logs_dir ->
     let d =
       List.filter (D.distro_supported_on arch) D.active_distros |>
       List.map Gen.gen_opam_for_distro |>
       List.fold_left (fun a -> function Some x -> x::a | None -> a) [] in
-    G.generate_dockerfiles ~crunch:false (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
+    G.generate_dockerfiles ~crunch:false build_dir d >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let arch_s = arch_to_docker arch in
     let gen_tag d = Fmt.strf "%s:linux-%s-opam-%s" hub_id arch_s d in
     let tag = gen_tag "{}" in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst d in
-    C.Parallel.run ~retries:1 ~results:logs_dir ~joblog cmd args >>= fun jobs ->
+    C.Parallel.run ~retries:1 ~results:logs_dir cmd args >>= fun jobs ->
     Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.sexp_of_t jobs)));
-    List.iter (fun job ->
-        match job.C.Parallel.Joblog.build_logfiles with
-        | None -> ()
-        | Some (stdout,_) ->
-          match C.Docker.build_id (Fpath.v stdout) with
-          | Ok id ->
-            Logs.info (fun l -> l "id %s -> %s" job.C.Parallel.Joblog.arg id);
-          | Error _ -> ()
-      ) jobs;
-    (* TODO check jobs all succeeded *)
-    List.iter (fun job ->
-        match C.Docker.push_cmd (gen_tag job.C.Parallel.Joblog.arg) |> C.run_out with
-        | Ok _ -> ()
-        | Error _ -> ()
-      ) jobs;
-    R.ok ()
+    CU.iter (fun job ->
+      gen_tag job.C.Parallel.Joblog.arg |>
+      C.Docker.push_cmd |>
+      CU.run_out >>= fun _ -> Ok ()
+    ) jobs
+    )
 
   let phase2 hub_id () =
     List.iter (fun distro ->
@@ -147,7 +140,7 @@ module Phases = struct
         let template = Fmt.strf "%s:OS-ARCH-opam-%s" hub_id (D.tag_of_distro distro) in
         let target = Fmt.strf "%s:%s" hub_id (D.tag_of_distro distro) in
         C.Docker.manifest_push ~platforms ~template ~target |>
-        C.run_out |> R.is_ok |> fun _ -> () (* TODO *)
+        CU.run_out |> R.is_ok |> fun _ -> () (* TODO *)
       ) D.active_distros;
     R.ok ()
 
@@ -156,30 +149,41 @@ module Phases = struct
     let build_dir = Fpath.(v build_dir / "archive") in
     let _logs_dir = Fpath.v logs_dir in
     Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
-    G.generate_dockerfile ~crunch:true (Fpath.to_string build_dir) d;
+    G.generate_dockerfile ~crunch:true build_dir d >>= fun () ->
     Bos.OS.Dir.set_current build_dir >>= fun () -> 
-    (C.Docker.build_cmd ~cache:false ~tag:"opam2-archive" (Fpath.v ".") |> C.run_out) >>= fun _ ->
+    (C.Docker.build_cmd ~cache:false ~tag:"opam2-archive" (Fpath.v ".") |> CU.run_out) >>= fun _ ->
     R.ok ()
 
-  let phase3_ocaml arch hub_id build_dir logs_dir () =
-    ignore(C.Docker.exists ()); (* TODO rresult *)
-    let build_dir = Fpath.v build_dir in
-    let logs_dir = Fpath.v logs_dir in
-    let joblog = Fpath.(logs_dir / "joblog.txt") in
-    Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
-    Bos.OS.Dir.create ~path:true logs_dir >>= fun _ ->
-    let d = List.filter (D.distro_supported_on arch) D.active_distros |> List.map (Gen.ocaml_compilers hub_id arch) in
-    G.generate_dockerfiles ~crunch:true (Fpath.to_string build_dir) d; (* TODO fpath build_dir *)
+  let phase3_megaocaml arch hub_id build_dir logs_dir () =
+    with_log_dirs build_dir logs_dir (fun build_dir logs_dir ->
+    let d =
+      List.filter (D.distro_supported_on arch) D.active_distros |>
+      List.map (Gen.ocaml_compilers hub_id arch) in
+    G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let arch_s = arch_to_docker arch in
-    let gen_tag d = Fmt.strf "%s:linux-%s-ocaml-%s" hub_id arch_s d in
+    let gen_tag d = Fmt.strf "%s:linux-%s-ocaml-all-%s" hub_id arch_s d in
     let tag = gen_tag "{}" in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst d in
-    C.Parallel.run ~retries:1 ~results:logs_dir ~joblog cmd args >>= fun jobs ->
-    Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.sexp_of_t jobs)));
-    (* TODO check jobs all succeeded *)
-    R.ok ()
+    C.Parallel.run ~retries:1 ~results:logs_dir cmd args >>= fun _ -> Ok ()
+    )
+
+  let phase3_ocaml arch hub_id build_dir logs_dir () =
+    with_log_dirs build_dir logs_dir (fun build_dir logs_dir ->
+    let d =
+      List.filter (D.distro_supported_on arch) D.active_distros |>
+      List.map (Gen.ocaml_compilers hub_id arch) in
+    G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
+    let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
+    let arch_s = arch_to_docker arch in
+    let gen_tag d = Fmt.strf "%s:linux-%s-ocaml-all-%s" hub_id arch_s d in
+    let tag = gen_tag "{}" in
+    let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag (Fpath.v ".") in
+    let args = List.map fst d in
+    C.Parallel.run ~retries:1 ~results:logs_dir cmd args >>= fun _ -> Ok ()
+    )
+
 
 end
 
@@ -225,11 +229,18 @@ let phase3_archive_cmd =
   Term.(term_result (const Phases.phase3_archive $ hub_id $ build_dir $ logs_dir $ setup_logs)),
   Term.info "phase3-cache" ~doc ~exits
 
+let phase3_megaocaml_cmd =
+  let doc = "generate a ocaml compiler container with all the things" in
+  let exits = Term.default_exits in
+  Term.(term_result (const Phases.phase3_megaocaml $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
+  Term.info "phase3-ocaml" ~doc ~exits
+
 let phase3_ocaml_cmd =
   let doc = "generate a matrix of ocaml compilers" in
   let exits = Term.default_exits in
   Term.(term_result (const Phases.phase3_ocaml $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
   Term.info "phase3-ocaml" ~doc ~exits
+
 
 let default_cmd =
   let doc = "build and push opam and OCaml multiarch container images" in
@@ -237,6 +248,6 @@ let default_cmd =
   Term.(ret (const (fun _ -> `Help (`Pager, None)) $ pure ())),
   Term.info "obi-docker" ~version:"v1.0.0" ~doc ~sdocs
 
-let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_ocaml_cmd]
+let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_megaocaml_cmd; phase3_ocaml_cmd]
 let () = Term.(exit @@ eval_choice default_cmd cmds)
 

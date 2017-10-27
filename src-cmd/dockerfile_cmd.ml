@@ -5,10 +5,19 @@ open Astring
 open R.Infix
 module OC = OS.Cmd
 
-let run_out ?env c =
-  let err = OS.Cmd.err_run_out in
-  OS.Cmd.run_out ?env ~err c |>
-  OS.Cmd.out_lines ~trim:true 
+module Utils = struct
+  let run_out ?env c =
+    let err = OS.Cmd.err_run_out in
+    OS.Cmd.run_out ?env ~err c |>
+    OS.Cmd.out_lines ~trim:true
+
+  let rec iter fn l =
+    match l with
+    | hd::tl -> fn hd >>= fun () -> iter fn tl
+    | [] -> Ok ()
+end
+
+open Utils
 
 (** Docker *)
 module Docker = struct
@@ -100,7 +109,7 @@ module Parallel = struct
   type t = joblog list [@@deriving sexp]
   let bin = Cmd.(v "parallel")
 
-  let run_cmd ?retries ?results ?joblog cmd args =
+  let run_cmd ?retries ?results cmd args =
     let open Cmd in
     let args = of_list args in
     let retries =
@@ -108,24 +117,24 @@ module Parallel = struct
       | None -> empty
       | Some r -> v "--retries" % string_of_int r in
     let joblog =
-      match joblog with
+      match results with
       | None -> empty
-      | Some j -> v "--joblog" % p j in
+      | Some r -> v "--joblog" % p Fpath.(r / "joblog.txt") in
     let results =
       match results with
       | None -> empty
       | Some r -> v "--results" % p r in
     bin % "--no-notice" %% retries %% joblog %% results %% cmd % ":::" %% args
 
-  let run ?retries ?results ?joblog cmd args =
+  let run ?retries ?results cmd args =
     let open Rresult.R.Infix in
-    let t = run_cmd ?retries ?results ?joblog cmd args in
+    let t = run_cmd ?retries ?results cmd args in
     run_out t >>= fun _ ->
-    match joblog with
+    match results with
     | None -> R.ok []
     | Some f ->
        Array.of_list args |> fun args ->
-       Joblog.v f |>
+       Joblog.v Fpath.(f / "joblog.txt") |>
        List.map (fun j ->
          let arg = args.(j.Joblog.seq - 1) in
          let build_logfiles =
@@ -135,6 +144,7 @@ module Parallel = struct
                let path = Fmt.strf "%a/1/%s/" Fpath.pp d arg in
                Some (path ^ "stdout", path ^ "stderr") in
          { j with arg; build_logfiles }) |> R.ok
+(* Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.sexp_of_t jobs))); *)
 
 end
 
