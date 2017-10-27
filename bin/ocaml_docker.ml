@@ -50,8 +50,8 @@ module Gen = struct
     install_opam_from_source ~install_wrappers:true ~branch:"master" () @@
     run "strip /usr/local/bin/opam" @@
     from ~tag distro @@
-    copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
-    copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
+    copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
+    copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.RPM.add_user ~sudo:true "opam" @@ (** TODO pin uid at 1000 *)
     L.Git.init ()
 
@@ -63,8 +63,8 @@ module Gen = struct
     install_opam_from_source ~install_wrappers:true ~branch:"master" () @@
     run "strip /usr/local/bin/opam" @@
     from ~tag distro @@
-    copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
-    copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
+    copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
+    copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.Zypper.add_user ~sudo:true "opam" @@
     L.Git.init ()
 
