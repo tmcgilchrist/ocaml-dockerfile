@@ -228,7 +228,7 @@ let phase3_megaocaml_cmd =
   let doc = "generate a ocaml compiler container with all the things" in
   let exits = Term.default_exits in
   Term.(term_result (const Phases.phase3_megaocaml $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
-  Term.info "phase3-ocaml" ~doc ~exits
+  Term.info "phase3-megaocaml" ~doc ~exits
 
 let phase3_ocaml_cmd =
   let doc = "generate a matrix of ocaml compilers" in
