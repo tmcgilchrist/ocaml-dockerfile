@@ -85,6 +85,7 @@ let latest_distros =
 let master_distro = `Debian `Stable
 
 let stable_ocaml_versions =
+  (* TODO move into ocaml-versions *)
   [ "4.00.1"; "4.01.0"; "4.02.3"; "4.03.0"; "4.03.0+flambda";
     "4.04.0"; "4.04.1"; "4.04.2"; "4.04.2+flambda"; "4.05.0"; "4.05.0+flambda" ]
 
@@ -104,6 +105,8 @@ let distro_arches (d:t) : arch list =
   | `Debian (`V8 | `V9) -> [ `X86_64; `Aarch64 ]
   | `Fedora `V26 -> [ `X86_64; `Aarch64 ]
   | _ -> [ `X86_64 ]
+
+module OV = Ocaml_version
 
 let ocaml_arches ov : arch list =
   match ov with

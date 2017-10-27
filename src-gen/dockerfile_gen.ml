@@ -49,6 +49,7 @@ let generate_dockerfiles ?(crunch=true) output_dir =
   )
 
 let generate_dockerfiles_in_git_branches ?readme ?(crunch=true) output_dir d =
+  (* TODO move git to dockerfile_cmd *)
   let git = Cmd.(v "git" % "-C" % p output_dir) in
   U.iter (fun (name, docker) ->
     Logs.info (fun l -> l "Switching to branch %s in %a\n%!" name Fpath.pp output_dir);
