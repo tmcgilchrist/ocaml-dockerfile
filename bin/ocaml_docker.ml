@@ -161,7 +161,7 @@ module Phases = struct
     setup_log_dirs ~prefix:"phase1" build_dir logs_dir @@ fun build_dir logs_dir ->
     List.filter (D.distro_supported_on arch) D.active_distros |>
     List.map Gen.gen_opam_for_distro |> fun ds ->
-    G.generate_dockerfiles ~crunch:true build_dir ds >>= fun () ->
+    G.generate_dockerfiles ~crunch:false build_dir ds >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     C.Parallel.run ~retries:1 ~results:logs_dir cmd (List.map fst ds) >>= fun jobs ->
