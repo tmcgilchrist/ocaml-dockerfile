@@ -45,9 +45,11 @@ module Gen = struct
   let yum_opam2 ?(labels=[]) ~distro ~tag () =
     header distro tag @@
     label (("distro_style", "apt")::labels) @@
+    L.RPM.update @@
     L.RPM.dev_packages ~extra:"which tar curl xz" () @@
     install_opam_from_source ~prefix:"/usr" ~install_wrappers:true ~branch:"master" () @@
     from ~tag distro @@
+    L.RPM.update @@
     L.RPM.dev_packages ~extra:"which tar curl xz" () @@
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
