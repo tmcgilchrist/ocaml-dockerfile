@@ -114,7 +114,7 @@ module Phases = struct
     List.filter (D.distro_supported_on arch) D.active_distros |>
     List.map Gen.gen_opam_for_distro |>
     List.fold_left (fun a -> function Some x -> x::a | None -> a) [] |> fun d ->
-    G.generate_dockerfiles ~crunch:false build_dir d >>= fun () ->
+    G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let arch_s = arch_to_docker arch in
     let gen_tag d = Fmt.strf "%s:linux-%s-opam-%s" hub_id arch_s d in
