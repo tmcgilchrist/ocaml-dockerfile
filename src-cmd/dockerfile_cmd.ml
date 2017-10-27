@@ -143,9 +143,14 @@ module Parallel = struct
            | Some d ->
                let path = Fmt.strf "%a/1/%s/" Fpath.pp d arg in
                Some (path ^ "stdout", path ^ "stderr") in
-         { j with arg; build_logfiles }) |> R.ok
-(* Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.sexp_of_t jobs))); *)
-
+         { j with arg; build_logfiles }) |> fun r ->
+         let fails = List.filter (fun {Joblog.exit_code;_} -> exit_code <> 0) r in
+         let is_ok = List.length fails = 0 in
+         if is_ok then Ok r else begin
+           let msg = Fmt.strf "Failed %d jobs: %s" (List.length fails)
+            (Sexplib.Sexp.to_string_hum (sexp_of_t fails)) in
+           R.error_msg msg
+         end
 end
 
 (** Opam *)
