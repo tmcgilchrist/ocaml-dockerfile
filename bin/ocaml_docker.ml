@@ -46,7 +46,7 @@ module Gen = struct
     header distro tag @@
     label (("distro_style", "apt")::labels) @@
     L.RPM.dev_packages ~extra:"which tar curl xz" () @@
-    install_opam_from_source ~prefix:"/usr/bin" ~install_wrappers:true ~branch:"master" () @@
+    install_opam_from_source ~prefix:"/usr" ~install_wrappers:true ~branch:"master" () @@
     from ~tag distro @@
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
@@ -58,7 +58,7 @@ module Gen = struct
     header distro tag @@
     label (("distro_style", "zypper")::labels) @@
     L.Zypper.dev_packages () @@
-    install_opam_from_source ~prefix:"/usr/bin" ~install_wrappers:true ~branch:"master" () @@
+    install_opam_from_source ~prefix:"/usr" ~install_wrappers:true ~branch:"master" () @@
     from ~tag distro @@
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
