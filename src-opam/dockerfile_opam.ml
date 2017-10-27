@@ -67,12 +67,9 @@ let opam_init
     master_cmds @@
     run_as_opam "opam init -a -y %s%s/opam-repository" compiler opamhome
 
-let install_opam_from_source ?prefix ?(install_wrappers=false) ?(branch="1.2") () =
+let install_opam_from_source ?(prefix="/usr/local") ?(install_wrappers=false) ?(branch="1.2") () =
   run "git clone -b %s git://github.com/ocaml/opam /tmp/opam" branch @@
-  let wrappers_dir = match prefix with
-  | None -> "/usr/local/share/opam"
-  | Some p -> Filename.concat p "share/opam"
-  in
+  let wrappers_dir = Filename.concat prefix "share/opam" in
   let inst name =
     Printf.sprintf "cp shell/wrap-%s.sh %s && echo 'wrap-%s-commands: \"%s/wrap-%s.sh\"' >> /etc/opamrc.userns" 
       name wrappers_dir name wrappers_dir name in
@@ -81,15 +78,9 @@ let install_opam_from_source ?prefix ?(install_wrappers=false) ?(branch="1.2") (
     | false -> "echo Not installing OPAM2 wrappers"
     | true -> Fmt.strf "mkdir -p %s && %s" wrappers_dir (String.concat " && " [inst "build"; inst "install"; inst "remove"])
   in
-  let install_target =
-    match branch with
-    |"1.2" -> "install"
-    |_ -> "cold-install"
-  in
   Linux.run_sh
-    "cd /tmp/opam && make cold && make%s %s && %s && rm -rf /tmp/opam"
-    (match prefix with None -> "" |Some p -> " prefix=\""^p^"\"")
-    install_target
+    "cd /tmp/opam && make cold && mkdir -p %s/bin && cp /tmp/opam/opam %s/bin/opam && cp /tmp/opam/opam-installer %s/bin/opam-installer && chmod a+x %s/bin/opam %s/bin/opam-installer && %s && rm -rf /tmp/opam"
+    prefix prefix prefix prefix prefix
     wrapper_cmd
 
 let header ?maintainer img tag =
