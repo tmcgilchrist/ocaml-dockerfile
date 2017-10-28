@@ -203,10 +203,10 @@ module Phases = struct
 
   (* Generate an opam archive suitable for pointing local builds at *)
   let phase3_archive cache hub_id build_dir logs_dir () =
-    setup_log_dirs ~prefix:"phase3-archive" build_dir logs_dir @@ fun build_dir logs_dir ->
+    setup_log_dirs ~prefix:"phase3-archive" build_dir logs_dir @@ fun build_dir md ->
     G.generate_dockerfile ~crunch:true build_dir (Gen.opam2_mirror hub_id) >>= fun () ->
     Bos.OS.Dir.set_current build_dir >>= fun () -> 
-    C.Docker.build_cmd ~cache ~tag:"opam2-archive" (Fpath.v ".") |> C.run_log logs_dir "archive"
+    C.Docker.build_cmd ~cache ~tag:"opam2-archive" (Fpath.v ".") |> C.run_log md "archive"
 
   (* Generate a single container with all the ocaml compilers present *)
   let phase3_megaocaml cache arch hub_id build_dir logs_dir () =
@@ -219,7 +219,7 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst d in
-    C.Parallel.run ~retries:1 md "parallel" cmd args >>= fun _ -> Ok ()
+    C.Parallel.run ~retries:1 md "build" cmd args >>= fun _ -> Ok ()
 
   let phase3_ocaml cache arch hub_id build_dir logs_dir () =
     let gen_tag d = Fmt.strf "%s:linux-%s-%s" hub_id (arch_to_docker arch) d in
@@ -232,7 +232,7 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst d in
-    C.Parallel.run ~delay:5.0 ~retries:1 md "parallel" cmd args >>= fun _ -> Ok ()
+    C.Parallel.run ~delay:5.0 ~retries:1 md "build" cmd args >>= fun _ -> Ok ()
 
 end
 
