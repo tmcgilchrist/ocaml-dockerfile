@@ -8,7 +8,7 @@ module OC = OS.Cmd
 module Mdlog = struct
   type cmd =
   | Cmd of {label: string}
-  | Parallel of {label: string; args: string }
+  | Parallel of {label: string; args: string list }
   [@@deriving sexp]
   
   type cmds = cmd list [@@deriving sexp]
@@ -29,7 +29,8 @@ module Mdlog = struct
     t.cmds <- Parallel {label; args} :: t.cmds
 
   let output t =
-    Logs.info (fun l -> l "%s" (Sexplib.Sexp.to_string_hum (sexp_of_cmds t.cmds)));
+    let cmds = List.rev t.cmds in
+    Logs.info (fun l -> l "%s" (Sexplib.Sexp.to_string_hum (sexp_of_cmds cmds)));
     Ok ()
 end
 
@@ -166,6 +167,7 @@ module Parallel = struct
   let run ?delay ?retries md label cmd args =
     let logs_dir = md.Mdlog.logs_dir in
     let results = Some logs_dir in
+    Mdlog.add_parallel md label args;
     let t = run_cmd ?delay ?retries ?results cmd args in
     run_log md label t >>= fun _ ->
     match results with
