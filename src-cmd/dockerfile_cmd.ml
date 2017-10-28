@@ -146,6 +146,7 @@ module Parallel = struct
     let open Rresult.R.Infix in
     let t = run_cmd ?delay ?retries ?results cmd args in
     run_out t >>= fun _ ->
+    Logs.debug (fun l -> l "done with parallel run");
     match results with
     | None -> R.ok []
     | Some f ->
