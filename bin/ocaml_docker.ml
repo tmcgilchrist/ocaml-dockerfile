@@ -211,6 +211,7 @@ module Phases = struct
     C.Parallel.run ~retries:1 ~results:logs_dir cmd args >>= fun _ -> Ok ()
 
   let phase3_ocaml arch hub_id build_dir logs_dir () =
+    let gen_tag d = Fmt.strf "%s:linux-%s-%s-ocaml" hub_id (arch_to_docker arch) d in
     setup_log_dirs ~prefix:"phase3-ocaml" build_dir logs_dir @@ fun build_dir logs_dir ->
     let d =
       List.filter (D.distro_supported_on arch) D.active_distros |>
