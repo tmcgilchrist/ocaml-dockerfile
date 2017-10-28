@@ -81,7 +81,7 @@ module Gen = struct
       List.map D.ocaml_version_to_opam_switch |>
       List.map (run "opam switch create %s") |> (@@@) empty in
     let d = 
-      header hub_id distro @@
+      header hub_id (Fmt.strf "%s-opam" distro) @@
       run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
       run "opam init -a /home/opam/opam-repository" @@
       compilers @@
@@ -89,14 +89,15 @@ module Gen = struct
     (Fmt.strf "%s-ocaml" distro), d
 
   let separate_ocaml_compilers hub_id arch distro =
+    let distro = D.tag_of_distro distro in
     D.stable_ocaml_versions |>
     List.filter (D.ocaml_supported_on arch) |>
     List.map (fun ov ->
       let d = 
-        header hub_id (D.tag_of_distro distro) @@
+        header hub_id (Fmt.strf "%s-opam" distro) @@
         run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
         run "opam init -a /home/opam/opam-repository -c %s" (D.ocaml_version_to_opam_switch ov) in
-      (Fmt.strf "%s-ocaml-%s" (D.tag_of_distro distro) ov), d
+      (Fmt.strf "%s-ocaml-%s" distro ov), d
     )
 
   let gen_opam_for_distro ?labels d =
