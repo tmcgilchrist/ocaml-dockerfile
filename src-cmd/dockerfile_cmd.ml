@@ -41,7 +41,8 @@ let rec iter fn l =
 
 let run_log ?env md name cmd =
   let log_dir = md.Mdlog.logs_dir in
-  Mdlog.add_cmd md name; 
+  Mdlog.add_cmd md name;
+  OS.File.write Fpath.(log_dir / (name ^ ".cmd")) (Cmd.to_string cmd) >>= fun () ->
   let err = OS.Cmd.err_file Fpath.(log_dir / (name ^ ".err")) in
   OS.Cmd.run_out ?env ~err cmd |>
   OS.Cmd.out_file Fpath.(log_dir / (name ^ ".out")) >>= fun ((), (_,status)) ->
