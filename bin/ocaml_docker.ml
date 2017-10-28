@@ -177,7 +177,7 @@ module Phases = struct
     G.generate_dockerfiles ~crunch:true build_dir ds >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
-    C.Parallel.run ~retries:1 ~results:logs_dir cmd (List.map fst ds) >>= fun jobs ->
+    C.Parallel.run ~retries:1 ~results:logs_dir logs_dir "parallel" cmd (List.map fst ds) >>= fun jobs ->
     CU.iter (fun job -> gen_tag job.C.Parallel.Joblog.arg |> C.Docker.push_cmd |> C.run_log logs_dir "parallel") jobs
 
   (* Push multiarch images to the Hub for base opam binaries *)
@@ -210,7 +210,7 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst d in
-    C.Parallel.run ~retries:1 ~results:logs_dir cmd args >>= fun _ -> Ok ()
+    C.Parallel.run ~retries:1 ~results:logs_dir logs_dir "parallel" cmd args >>= fun _ -> Ok ()
 
   let phase3_ocaml arch hub_id build_dir logs_dir () =
     let gen_tag d = Fmt.strf "%s:linux-%s-%s" hub_id (arch_to_docker arch) d in
@@ -223,7 +223,7 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst d in
-    C.Parallel.run ~delay:5.0 ~retries:1 ~results:logs_dir cmd args >>= fun _ -> Ok ()
+    C.Parallel.run ~delay:5.0 ~retries:1 ~results:logs_dir logs_dir "parallel" cmd args >>= fun _ -> Ok ()
 
 end
 

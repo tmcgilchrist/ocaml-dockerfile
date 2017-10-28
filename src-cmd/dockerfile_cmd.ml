@@ -142,10 +142,10 @@ module Parallel = struct
       | Some r -> v "--results" % p r in
     bin % "--no-notice" %% retries %% joblog %% delay %% results %% cmd % ":::" %% args
 
-  let run ?delay ?retries ?results cmd args =
+  let run ?delay ?retries ?results log_dir label cmd args =
     let open Rresult.R.Infix in
     let t = run_cmd ?delay ?retries ?results cmd args in
-    run_out t >>= fun _ ->
+    run_log log_dir label t >>= fun _ ->
     Logs.debug (fun l -> l "done with parallel run");
     match results with
     | None -> R.ok []
