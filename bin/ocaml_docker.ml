@@ -4,6 +4,11 @@ module D = Dockerfile_distro
 module C = Dockerfile_cmd
 module G = Dockerfile_gen
 
+let arch_to_docker = function
+ | `X86_64 -> "amd64"
+ | `Aarch64 -> "arm64"
+
+
 module Gen = struct
   open Dockerfile
   open Dockerfile_opam
@@ -152,6 +157,13 @@ module Gen = struct
         | `V42_1 -> "42.1"  | `V42_2 -> "42.2" | `V42_3 -> "42.3"
         | _ -> assert false in
       D.tag_of_distro d, (zypper_opam2 ?labels ~distro:"opensuse" ~tag ())
+
+   let multiarch_manifest ~target ~platforms =
+     let ms =
+       List.map (fun (image, arch) ->
+         Fmt.strf "  -\n    image: %s\n    platform:\n      architecture: %s\n      os: linux\n" image arch
+       ) platforms |> String.concat "\n" in
+     Fmt.strf "image: %s\nmanifests:\n%s" target ms
 end
 
 module Phases = struct
@@ -159,12 +171,9 @@ module Phases = struct
   open Rresult
   open R.Infix
 
-  let arch_to_docker = function
-    | `X86_64 -> "amd64"
-    | `Aarch64 -> "arm64"
-
   let setup_log_dirs ~prefix build_dir logs_dir fn =
     Fpath.(build_dir / prefix) |> fun build_dir ->
+    Fpath.(logs_dir / prefix) |> fun logs_dir ->
     Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
     Bos.OS.Dir.create ~path:true logs_dir >>= fun _ ->
     let md = C.Mdlog.init ~logs_dir ~prefix ~descr:prefix in (* TODO descr *)
@@ -182,23 +191,32 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst ds in
-    C.Mdlog.run_parallel ~retries:1 md "build" cmd [args] >>= fun jobs ->
+    C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun jobs ->
     let cmd = C.Docker.push_cmd "{}" in
-    C.Mdlog.run_parallel ~retries:1 md "push" cmd [args] >>= fun jobs ->
+    C.Mdlog.run_parallel ~retries:1 md "push" cmd args >>= fun jobs ->
     Ok ()
 
   (* Push multiarch images to the Hub for base opam binaries *)
   let phase2 hub_id build_dir logs_dir () =
     setup_log_dirs ~prefix:"phase2" build_dir logs_dir @@ fun build_dir md ->
-    let template = Fmt.strf "%s:OS-{}-ARCH-opam" hub_id in
-    let target = Fmt.strf "%s:{1}-opam" hub_id in
-    let cmd = C.Docker.manifest_push ~platforms:["{2}"] ~template ~target in
-    let distros = List.map D.tag_of_distro D.active_distros in
-    let arches = List.map (fun distro ->
-      D.distro_arches distro |>
-      List.map (fun arch -> Fmt.strf "linux/%s" (arch_to_docker arch)) |>
-      String.concat ",") D.active_distros in
-    let args = [distros; arches] in
+    (* Generate yaml files *)
+    let yamls =
+      List.map (fun distro ->
+        let tag = D.tag_of_distro distro in
+        let target = Fmt.strf "%s:%s-opam" hub_id tag in
+        let platforms =
+          D.distro_arches distro |>
+          List.map (fun arch ->
+            let arch = arch_to_docker arch in
+            let image = Fmt.strf "%s:linux-%s-%s-opam" hub_id tag arch in
+            image, arch) in
+        Gen.multiarch_manifest ~target ~platforms |> fun m ->
+        let fname = Fpath.(build_dir / (tag ^ ".yml")) in
+        fname, m
+      ) D.active_distros in
+    C.iter (fun (f,m) -> Bos.OS.File.write f m) yamls >>= fun () ->
+    let cmd = C.Docker.manifest_push_file Fpath.(v "{}") in
+    let args = List.map (fun (f,_) -> Fpath.to_string f) yamls in
     C.Mdlog.run_parallel ~retries:1 md "manifest" cmd args >>= fun _ ->
     Ok ()
 
@@ -209,7 +227,7 @@ module Phases = struct
     Bos.OS.Dir.set_current build_dir >>= fun () -> 
     let cmd = C.Docker.build_cmd ~cache ~tag:"{}" (Fpath.v ".") in
     let args = ["opam2-archive"] in
-    C.Mdlog.run_parallel ~retries:1 md "archive" cmd [args] >>= fun _ ->
+    C.Mdlog.run_parallel ~retries:1 md "archive" cmd args >>= fun _ ->
     Ok ()
 
   (* Generate a single container with all the ocaml compilers present *)
@@ -223,7 +241,7 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst d in
-    C.Mdlog.run_parallel ~retries:1 md "build" cmd [args] >>= fun _ -> Ok ()
+    C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun _ -> Ok ()
 
   let phase3_ocaml cache arch hub_id build_dir logs_dir () =
     let gen_tag d = Fmt.strf "%s:linux-%s-%s" hub_id (arch_to_docker arch) d in
@@ -236,7 +254,7 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst d in
-    C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "build" cmd [args] >>= fun _ -> Ok ()
+    C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "build" cmd args >>= fun _ -> Ok ()
 end
 
 open Cmdliner

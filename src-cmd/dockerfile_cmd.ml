@@ -63,10 +63,13 @@ module Docker = struct
     List.rev lines |> fun lines ->
     find_id lines
 
-  let manifest_push ~platforms ~template ~target =
+  let manifest_push_cli ~platforms ~template ~target =
     let platforms = String.concat ~sep:"," platforms in
     Cmd.(v "manifest-tool" % "push" % "from-args" % "--platforms" % platforms
          % "--template" % template % "--target" % target)
+
+  let manifest_push_file file =
+     Cmd.(v "manifest-tool" % "push" % "from-spec" % p file)
 end
 
 (** Gnu Parallel *)
@@ -74,7 +77,7 @@ module Parallel = struct
 
   module Joblog = struct
     type t = {
-      args: string list;
+      arg: string;
       seq: int;
       host: string;
       start_time: float;
@@ -91,7 +94,7 @@ module Parallel = struct
       let find = Csv.Row.find row in
       let find_int field = find field |> int_of_string in
       let find_float field = find field |> float_of_string in
-      { args = []; build_logfiles = None;
+      { arg = ""; build_logfiles = None;
         seq = find_int "Seq";
         host = find "Host";
         start_time = find_float "Starttime";
@@ -115,7 +118,7 @@ module Parallel = struct
 
   let run_cmd ?delay ?retries ?results cmd args =
     let open Cmd in
-    let args = List.map (fun a -> ":::" :: a) args |> List.flatten |> of_list in
+    let args = of_list args in
     let retries =
       match retries with
       | None -> empty
@@ -132,7 +135,7 @@ module Parallel = struct
       match results with
       | None -> empty
       | Some r -> v "--results" % p r in
-    bin % "--no-notice" % "--link" %% retries %% joblog %% delay %% results %% cmd %% args
+    bin % "--no-notice" %% retries %% joblog %% delay %% results %% cmd % ":::" %% args
 
   let run ?delay ?retries logs_dir label cmd args =
     let results = Some logs_dir in
@@ -143,14 +146,14 @@ module Parallel = struct
     | Some f ->
        Joblog.v Fpath.(f / "joblog.txt") |>
        List.map (fun j ->
-         let args = List.map (fun a -> List.nth a (j.Joblog.seq - 1)) args in
+         let arg = List.nth args (j.Joblog.seq - 1) in
          let build_logfiles =
            match results with
            | None -> None
            | Some d ->
                let path = Fmt.strf "%a/1/%s/" Fpath.pp d "TODO" in
                Some (path ^ "stdout", path ^ "stderr") in
-         { j with args; build_logfiles }) |> fun r ->
+         { j with arg; build_logfiles }) |> fun r ->
          let fails = List.filter (fun {Joblog.exit_code;_} -> exit_code <> 0) r in
          let is_ok = List.length fails = 0 in
          if is_ok then Ok r else begin
@@ -175,7 +178,7 @@ end
 module Mdlog = struct
 
   type cmd =
-  | Parallel of {label:string; args:string list list } [@@deriving sexp]
+  | Parallel of {label:string; args:string list } [@@deriving sexp]
   
   type cmds = cmd list [@@deriving sexp]
 
