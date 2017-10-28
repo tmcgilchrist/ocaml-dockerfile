@@ -19,7 +19,7 @@ open Dockerfile
 open Bos
 open Rresult
 open R.Infix
-module U = Dockerfile_cmd.Utils
+module U = Dockerfile_cmd
 
 let write_dockerfile ~crunch file dfile =
   Logs.debug (fun l -> l "Writing Dockerfile to %a" Fpath.pp file);

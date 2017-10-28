@@ -5,19 +5,10 @@ open Astring
 open R.Infix
 module OC = OS.Cmd
 
-module Utils = struct
-  let run_out ?env c =
-    let err = OS.Cmd.err_run_out in
-    OS.Cmd.run_out ?env ~err c |>
-    OS.Cmd.out_lines ~trim:true
-
-  let rec iter fn l =
-    match l with
-    | hd::tl -> fn hd >>= fun () -> iter fn tl
-    | [] -> Ok ()
-end
-
-open Utils
+let rec iter fn l =
+  match l with
+  | hd::tl -> fn hd >>= fun () -> iter fn tl
+  | [] -> Ok ()
 
 let run_log ?env log_dir name cmd =
   let err = OS.Cmd.err_file Fpath.(log_dir / (name ^ ".err")) in
@@ -37,7 +28,7 @@ module Docker = struct
   let info = Cmd.(bin % "info")
 
   let exists () =
-    run_out info |> OC.success |> R.is_ok |>
+    OS.Cmd.run_out info |> OS.Cmd.out_string |> R.is_ok |>
     function
     | true -> Logs.info (fun l -> l "Docker is running"); true
     | false -> Logs.err (fun l -> l "Docker not running"); false

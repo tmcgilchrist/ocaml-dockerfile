@@ -2,7 +2,6 @@
 module L = Dockerfile_linux
 module D = Dockerfile_distro
 module C = Dockerfile_cmd
-module CU = Dockerfile_cmd.Utils
 module G = Dockerfile_gen
 
 module Gen = struct
@@ -181,12 +180,12 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     C.Parallel.run ~retries:1 ~results:logs_dir logs_dir "parallel" cmd (List.map fst ds) >>= fun jobs ->
-    CU.iter (fun job -> gen_tag job.C.Parallel.Joblog.arg |> C.Docker.push_cmd |> C.run_log logs_dir "parallel") jobs
+    C.iter (fun job -> gen_tag job.C.Parallel.Joblog.arg |> C.Docker.push_cmd |> C.run_log logs_dir "parallel") jobs
 
   (* Push multiarch images to the Hub for base opam binaries *)
   let phase2 hub_id build_dir logs_dir () =
     setup_log_dirs ~prefix:"phase2" build_dir logs_dir @@ fun build_dir logs_dir ->
-    CU.iter (fun distro ->
+    C.iter (fun distro ->
       let log_tag = Fmt.strf "push-%s" (D.tag_of_distro distro) in
       let arches = D.distro_arches distro in
       let platforms = List.map (fun a -> Fmt.strf "linux/%s" (arch_to_docker a)) arches in
