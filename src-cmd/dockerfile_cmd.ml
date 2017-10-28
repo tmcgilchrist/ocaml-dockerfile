@@ -39,9 +39,9 @@ let rec iter fn l =
   | hd::tl -> fn hd >>= fun () -> iter fn tl
   | [] -> Ok ()
 
-let run_log ?env md name cmd =
+let run_log ?(log=true) ?env md name cmd =
   let log_dir = md.Mdlog.logs_dir in
-  Mdlog.add_cmd md name;
+  if log then Mdlog.add_cmd md name;
   OS.File.write Fpath.(log_dir / (name ^ ".cmd")) (Cmd.to_string cmd) >>= fun () ->
   let err = OS.Cmd.err_file Fpath.(log_dir / (name ^ ".err")) in
   OS.Cmd.run_out ?env ~err cmd |>
@@ -170,7 +170,7 @@ module Parallel = struct
     let results = Some logs_dir in
     Mdlog.add_parallel md label args;
     let t = run_cmd ?delay ?retries ?results cmd args in
-    run_log md label t >>= fun _ ->
+    run_log ~log:false md label t >>= fun _ ->
     match results with
     | None -> R.ok []
     | Some f ->
