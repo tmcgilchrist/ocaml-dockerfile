@@ -192,7 +192,7 @@ module Phases = struct
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst ds in
     C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun jobs ->
-    let cmd = C.Docker.push_cmd "{}" in
+    let cmd = C.Docker.push_cmd (gen_tag "{}") in
     C.Mdlog.run_parallel ~retries:1 md "push" cmd args >>= fun jobs ->
     Ok ()
 
