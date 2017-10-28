@@ -90,13 +90,10 @@ val distro_of_tag : string -> t option
 (** [distro_of_tag s] parses [s] into a {!t} distribution, and
     [None] otherwise. *)
 
-val opam_tag_of_distro : t -> string -> string
-(** [opam_tag_of_distro distro ocaml_version] will generate
-  a Docker Hub tag that maps to the container that matches
-  the OS/OCaml combination.  They can be found by default in
-  the [ocaml] organisation in Docker Hub. *)
-
 val ocaml_version_to_opam_switch : string -> string
+(* TODO *)
+
+val tag_of_ocaml_version : string -> string
 (* TODO *)
 
 val latest_tag_of_distro : t -> string
@@ -129,34 +126,3 @@ val to_dockerfile :
    current switch pointing to [ocaml_version]. If [pin]
    is specified then an [opam pin add <pin>] will be added
    to the initialisation. *)
-
-val dockerfile_matrix :
-  ?opam_version:string -> 
-  ?extra:t list ->
-  ?extra_ocaml_versions:string list ->
-  ?pin:string ->
-  unit -> (t * string * Dockerfile.t) list
-(** [dockerfile_matrix ?pin ()] contains the list of Docker tags
-   and their associated Dockerfiles for all distributions.
-   The user of the container can assume that OPAM is installed
-   and initialised to the central remote, and that [opam depext]
-   is available on that container. If [pin] is specified then an
-   [opam pin add <pin>] will be added to the initialisation. *)
-
-(** {2 Dockerfile generators and iterators } *)
-
-val map :
-  ?filter:(t * string * Dockerfile.t -> bool)  ->
-  ?org:string ->
-  (distro:t -> ocaml_version:string -> Dockerfile.t -> 'a) ->
-  'a list
-(* [map ?org fn] will map all the supported Docker containers across [fn].
-   [fn] will be passed the {!distro}, OCaml compiler version and a base
-   Dockerfile that is based off a Docker Hub image from the [org] organisation
-   (by default, this is [ocaml/opam]. *)
-
-val map_tag :
-  ?filter:(t * string * Dockerfile.t -> bool) ->
-  (distro:t -> ocaml_version:string -> 'a) -> 'a list
-(** [map_tag fn] executes [fn distro ocaml_version] with a tag suitable for use
-   against the [ocaml/opam:TAG] Docker Hub. *)

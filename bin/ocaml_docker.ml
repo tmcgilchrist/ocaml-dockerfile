@@ -100,7 +100,7 @@ module Gen = struct
         header hub_id (Fmt.strf "%s-opam" distro) @@
         run "git -C /home/opam/opam-repository pull origin master" @@
         run "opam init -a /home/opam/opam-repository -c %s" (D.ocaml_version_to_opam_switch ov) in
-      (Fmt.strf "%s-ocaml-%s" distro ov), d
+      (Fmt.strf "%s-ocaml-%s" distro (D.tag_of_ocaml_version ov)), d
     )
 
   let gen_opam_for_distro ?labels d =

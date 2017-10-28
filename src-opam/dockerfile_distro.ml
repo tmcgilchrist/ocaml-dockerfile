@@ -16,6 +16,7 @@
  *)
 
 (** Distro selection for various OPAM combinations *)
+open Astring
 open Dockerfile
 open Dockerfile_opam
 module Linux = Dockerfile_linux
@@ -303,12 +304,6 @@ let latest_tag_of_distro (t:t) =
   |`Alpine _ -> "alpine"
   |`OpenSUSE _ -> "opensuse"
 
-let opam_tag_of_distro distro ocaml_version =
-  (* Docker rewrites + to _ in tags *)
-  let ocaml_version = Str.(global_replace (regexp_string "+") "_" ocaml_version) in
-  Printf.sprintf "%s_ocaml-%s"
-    (tag_of_distro distro) ocaml_version
-
 (* Build the OPAM distributions from the OCaml base *)
 let add_comment ?compiler_version tag =
   comment "OPAM for %s with %s" tag
@@ -351,7 +346,7 @@ let yum_opam ?(extra=[]) ?extra_cmd ?pin ?opam_version ?compiler_version labels 
     maybe (fun x -> x) extra_cmd @@
     (* TODO FIXME opam2dev needs openssl as a dependency but review if this is still needed by release *)
     let extra = match need_upgrade with false -> extra | true -> "openssl" :: extra in
-    Linux.RPM.dev_packages ~extra:(String.concat " " ("which"::"tar"::"wget"::"xz"::extra)) () @@
+    Linux.RPM.dev_packages ~extra:(String.concat ~sep:" " ("which"::"tar"::"wget"::"xz"::extra)) () @@
     install_opam_from_source ~install_wrappers ~prefix:"/usr" ?branch () @@
     Dockerfile_opam.install_cloud_solver @@
     run "sed -i.bak '/LC_TIME LC_ALL LANGUAGE/aDefaults    env_keep += \"OPAMYES OPAMJOBS OPAMVERBOSE\"' /etc/sudoers" @@
@@ -414,7 +409,10 @@ let ocaml_version_to_opam_switch = function
   |"4.07.0" -> "4.07.0+trunk"
   |"4.07.0+flambda" -> "4.07.0+trunk+flambda"
   |ov -> ov
- 
+
+let tag_of_ocaml_version ov =
+  String.map (function '+' -> '-' | x -> x) ov
+
 (* Construct a Dockerfile for a distro/ocaml combo, using the
    system OCaml if possible, or a custom OPAM switch otherwise *)
 let to_dockerfile ?pin ?(opam_version=latest_opam_version) ~ocaml_version ~distro () =
@@ -449,38 +447,3 @@ let to_dockerfile ?pin ?(opam_version=latest_opam_version) ~ocaml_version ~distr
   | `OracleLinux _ -> yum_opam ?pin ~opam_version ?compiler_version labels distro tag
   | `Alpine os_version -> apk_opam ?pin ~opam_version ?compiler_version ~os_version labels tag
   | `OpenSUSE _ -> zypper_opam ?pin ~opam_version ?compiler_version labels tag
-
-(* Build up the matrix of Dockerfiles *)
-let dockerfile_matrix ?(opam_version=latest_opam_version) ?(extra=[]) ?(extra_ocaml_versions=[]) ?pin () =
-  List.map (fun ocaml_version ->
-    List.map (fun distro ->
-      distro,
-      ocaml_version,
-      to_dockerfile ?pin ~opam_version ~ocaml_version ~distro ()
-    ) (distros @ extra)
-  ) (stable_ocaml_versions @ extra_ocaml_versions)
-  |> List.flatten |>
-  (List.sort (fun (a,_,_) (b,_,_) -> compare a b))
-
-(*
-let latest_dockerfile_matrix ?(opam_version=latest_opam_version) ?(extra=[]) ?pin () =
-  List.map (fun distro ->
-    distro,
-    to_dockerfile ?pin ~opam_version ~ocaml_version:latest_ocaml_version ~distro ()
-  ) (latest_stable_distros @ extra) |> 
-  List.sort (fun (a,_) (b,_) -> compare a b)
-*)
-
-let map_tag ?filter fn =
-  List.filter
-    (match filter with
-      | None -> (fun _ -> true)
-      | Some fn -> fn) (dockerfile_matrix ())
-  |>
-  List.map (fun (distro,ocaml_version,_) -> fn ~distro ~ocaml_version)
-
-let map ?filter ?(org="ocaml/opam") fn =
-  map_tag ?filter (fun ~distro ~ocaml_version ->
-   let tag = opam_tag_of_distro distro ocaml_version in
-   let base = from org ~tag in
-   fn ~distro ~ocaml_version base)
