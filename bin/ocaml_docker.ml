@@ -183,11 +183,12 @@ module Phases = struct
   let phase2 hub_id build_dir logs_dir () =
     setup_log_dirs ~prefix:"phase2" build_dir logs_dir @@ fun build_dir logs_dir ->
     CU.iter (fun distro ->
+      let log_tag = Fmt.strf "push-%s" (D.tag_of_distro distro) in
       let arches = D.distro_arches distro in
       let platforms = List.map (fun a -> Fmt.strf "linux/%s" (arch_to_docker a)) arches in
-      let template = Fmt.strf "%s:OS-ARCH-%s-opam" hub_id (D.tag_of_distro distro) in
+      let template = Fmt.strf "%s:OS-%s-ARCH-opam" hub_id (D.tag_of_distro distro) in
       let target = Fmt.strf "%s:%s-opam" hub_id (D.tag_of_distro distro) in
-      C.Docker.manifest_push ~platforms ~template ~target |> C.run_log logs_dir "push"
+      C.Docker.manifest_push ~platforms ~template ~target |> C.run_log logs_dir log_tag
     ) D.active_distros
 
   (* Generate an opam archive suitable for pointing local builds at *)
