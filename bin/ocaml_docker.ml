@@ -161,7 +161,7 @@ module Gen = struct
    let multiarch_manifest ~target ~platforms =
      let ms =
        List.map (fun (image, arch) ->
-         Fmt.strf "  -\n    image: %s\n    platform:\n      architecture: %s\n      os: linux\n" image arch
+         Fmt.strf "  -\n    image: %s\n    platform:\n      architecture: %s\n      os: linux" image arch
        ) platforms |> String.concat "\n" in
      Fmt.strf "image: %s\nmanifests:\n%s" target ms
 end
