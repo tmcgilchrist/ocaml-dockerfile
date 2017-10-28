@@ -5,43 +5,12 @@ open Astring
 open R.Infix
 module OC = OS.Cmd
 
-module Mdlog = struct
-  type cmd =
-  | Cmd of {label: string}
-  | Parallel of {label: string; args: string list }
-  [@@deriving sexp]
-  
-  type cmds = cmd list [@@deriving sexp]
-  type t = {
-    mutable cmds: cmds;
-    logs_dir: Fpath.t;
-    prefix: string;
-    descr: string;
-  }
-  
-  let init ~logs_dir ~prefix ~descr =
-    { cmds=[]; logs_dir; prefix; descr }
-
-  let add_cmd t label =
-    t.cmds <- Cmd {label} :: t.cmds
-
-  let add_parallel t label args =
-    t.cmds <- Parallel {label; args} :: t.cmds
-
-  let output t =
-    let cmds = List.rev t.cmds in
-    Logs.info (fun l -> l "%s" (Sexplib.Sexp.to_string_hum (sexp_of_cmds cmds)));
-    Ok ()
-end
-
 let rec iter fn l =
   match l with
   | hd::tl -> fn hd >>= fun () -> iter fn tl
   | [] -> Ok ()
 
-let run_log ?(log=true) ?env md name cmd =
-  let log_dir = md.Mdlog.logs_dir in
-  if log then Mdlog.add_cmd md name;
+let run_log ?env log_dir name cmd =
   OS.File.write Fpath.(log_dir / (name ^ ".cmd")) (Cmd.to_string cmd) >>= fun () ->
   let err = OS.Cmd.err_file Fpath.(log_dir / (name ^ ".err")) in
   OS.Cmd.run_out ?env ~err cmd |>
@@ -105,7 +74,7 @@ module Parallel = struct
 
   module Joblog = struct
     type t = {
-      arg: string;
+      args: string list;
       seq: int;
       host: string;
       start_time: float;
@@ -122,7 +91,7 @@ module Parallel = struct
       let find = Csv.Row.find row in
       let find_int field = find field |> int_of_string in
       let find_float field = find field |> float_of_string in
-      { arg = ""; build_logfiles = None;
+      { args = []; build_logfiles = None;
         seq = find_int "Seq";
         host = find "Host";
         start_time = find_float "Starttime";
@@ -146,7 +115,7 @@ module Parallel = struct
 
   let run_cmd ?delay ?retries ?results cmd args =
     let open Cmd in
-    let args = of_list args in
+    let args = List.map (fun a -> ":::" :: a) args |> List.flatten |> of_list in
     let retries =
       match retries with
       | None -> empty
@@ -163,28 +132,25 @@ module Parallel = struct
       match results with
       | None -> empty
       | Some r -> v "--results" % p r in
-    bin % "--no-notice" %% retries %% joblog %% delay %% results %% cmd % ":::" %% args
+    bin % "--no-notice" % "--link" %% retries %% joblog %% delay %% results %% cmd %% args
 
-  let run ?delay ?retries md label cmd args =
-    let logs_dir = md.Mdlog.logs_dir in
+  let run ?delay ?retries logs_dir label cmd args =
     let results = Some logs_dir in
-    Mdlog.add_parallel md label args;
     let t = run_cmd ?delay ?retries ?results cmd args in
-    run_log ~log:false md label t >>= fun _ ->
+    run_log logs_dir label t >>= fun _ ->
     match results with
     | None -> R.ok []
     | Some f ->
-       Array.of_list args |> fun args ->
        Joblog.v Fpath.(f / "joblog.txt") |>
        List.map (fun j ->
-         let arg = args.(j.Joblog.seq - 1) in
+         let args = List.map (fun a -> List.nth a (j.Joblog.seq - 1)) args in
          let build_logfiles =
            match results with
            | None -> None
            | Some d ->
-               let path = Fmt.strf "%a/1/%s/" Fpath.pp d arg in
+               let path = Fmt.strf "%a/1/%s/" Fpath.pp d "TODO" in
                Some (path ^ "stdout", path ^ "stderr") in
-         { j with arg; build_logfiles }) |> fun r ->
+         { j with args; build_logfiles }) |> fun r ->
          let fails = List.filter (fun {Joblog.exit_code;_} -> exit_code <> 0) r in
          let is_ok = List.length fails = 0 in
          if is_ok then Ok r else begin
@@ -205,6 +171,37 @@ module Opam = struct
     String.Map.add "OPAMJOBS" (string_of_int jobs) |> fun env ->
     R.return env
 end
+
+module Mdlog = struct
+
+  type cmd =
+  | Parallel of {label:string; args:string list list } [@@deriving sexp]
+  
+  type cmds = cmd list [@@deriving sexp]
+
+  type t = {
+    mutable cmds: cmds;
+    logs_dir: Fpath.t;
+    prefix: string;
+    descr: string;
+  }
+  
+  let init ~logs_dir ~prefix ~descr =
+    { cmds=[]; logs_dir; prefix; descr }
+
+  let run_parallel ?retries ?delay t label cmd args =
+    (* TODO still log on failure *)
+    let logs_dir = Fpath.(t.logs_dir / t.prefix) in
+    Parallel.run ?retries ?delay logs_dir label cmd args >>= fun jobs ->
+    t.cmds <- Parallel {label; args} :: t.cmds;
+    Ok ()
+
+  let output t =
+    let cmds = List.rev t.cmds in
+    Logs.info (fun l -> l "%s" (Sexplib.Sexp.to_string_hum (sexp_of_cmds cmds)));
+    Ok ()
+end
+
 
 open Cmdliner
 let setup_logs () =

@@ -159,8 +159,7 @@ module Phases = struct
   open Rresult
   open R.Infix
 
-  let arch_to_docker =
-    function
+  let arch_to_docker = function
     | `X86_64 -> "amd64"
     | `Aarch64 -> "arm64"
 
@@ -183,30 +182,36 @@ module Phases = struct
     G.generate_dockerfiles ~crunch:true build_dir ds >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
-    C.Parallel.run ~retries:1 md "build" cmd (List.map fst ds) >>= fun jobs ->
-    C.iter (fun job ->
-      gen_tag job.C.Parallel.Joblog.arg |>
-      C.Docker.push_cmd |> C.run_log md (Fmt.strf "push-%s-%s" job.C.Parallel.Joblog.arg arch_s)
-    ) jobs
+    let args = List.map fst ds in
+    C.Mdlog.run_parallel ~retries:1 md "build" cmd [args] >>= fun jobs ->
+    let cmd = C.Docker.push_cmd "{}" in
+    C.Mdlog.run_parallel ~retries:1 md "push" cmd [args] >>= fun jobs ->
+    Ok ()
 
   (* Push multiarch images to the Hub for base opam binaries *)
   let phase2 hub_id build_dir logs_dir () =
     setup_log_dirs ~prefix:"phase2" build_dir logs_dir @@ fun build_dir md ->
-    C.iter (fun distro ->
-      let log_tag = Fmt.strf "push-%s" (D.tag_of_distro distro) in
-      let arches = D.distro_arches distro in
-      let platforms = List.map (fun a -> Fmt.strf "linux/%s" (arch_to_docker a)) arches in
-      let template = Fmt.strf "%s:OS-%s-ARCH-opam" hub_id (D.tag_of_distro distro) in
-      let target = Fmt.strf "%s:%s-opam" hub_id (D.tag_of_distro distro) in
-      C.Docker.manifest_push ~platforms ~template ~target |> C.run_log md log_tag
-    ) D.active_distros
+    let template = Fmt.strf "%s:OS-{}-ARCH-opam" hub_id in
+    let target = Fmt.strf "%s:{1}-opam" hub_id in
+    let cmd = C.Docker.manifest_push ~platforms:["{2}"] ~template ~target in
+    let distros = List.map D.tag_of_distro D.active_distros in
+    let arches = List.map (fun distro ->
+      D.distro_arches distro |>
+      List.map (fun arch -> Fmt.strf "linux/%s" (arch_to_docker arch)) |>
+      String.concat ",") D.active_distros in
+    let args = [distros; arches] in
+    C.Mdlog.run_parallel ~retries:1 md "manifest" cmd args >>= fun _ ->
+    Ok ()
 
   (* Generate an opam archive suitable for pointing local builds at *)
   let phase3_archive cache hub_id build_dir logs_dir () =
     setup_log_dirs ~prefix:"phase3-archive" build_dir logs_dir @@ fun build_dir md ->
     G.generate_dockerfile ~crunch:true build_dir (Gen.opam2_mirror hub_id) >>= fun () ->
     Bos.OS.Dir.set_current build_dir >>= fun () -> 
-    C.Docker.build_cmd ~cache ~tag:"opam2-archive" (Fpath.v ".") |> C.run_log md "archive"
+    let cmd = C.Docker.build_cmd ~cache ~tag:"{}" (Fpath.v ".") in
+    let args = ["opam2-archive"] in
+    C.Mdlog.run_parallel ~retries:1 md "archive" cmd [args] >>= fun _ ->
+    Ok ()
 
   (* Generate a single container with all the ocaml compilers present *)
   let phase3_megaocaml cache arch hub_id build_dir logs_dir () =
@@ -219,7 +224,7 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst d in
-    C.Parallel.run ~retries:1 md "build" cmd args >>= fun _ -> Ok ()
+    C.Mdlog.run_parallel ~retries:1 md "build" cmd [args] >>= fun _ -> Ok ()
 
   let phase3_ocaml cache arch hub_id build_dir logs_dir () =
     let gen_tag d = Fmt.strf "%s:linux-%s-%s" hub_id (arch_to_docker arch) d in
@@ -232,8 +237,7 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst d in
-    C.Parallel.run ~delay:5.0 ~retries:1 md "build" cmd args >>= fun _ -> Ok ()
-
+    C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "build" cmd [args] >>= fun _ -> Ok ()
 end
 
 open Cmdliner
