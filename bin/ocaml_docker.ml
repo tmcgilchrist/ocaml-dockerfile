@@ -182,7 +182,7 @@ module Phases = struct
     C.Mdlog.output md
 
   (* Generate base opam binaries for all distros *)
-  let phase1 cache arch hub_id build_dir logs_dir () =
+  let phase1 cache push arch hub_id build_dir logs_dir () =
     let arch_s = arch_to_docker arch in
     let prefix = Fmt.strf "phase1-%s" arch_s in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
@@ -194,9 +194,10 @@ module Phases = struct
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst ds in
     C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun jobs ->
-    let cmd = C.Docker.push_cmd (gen_tag "{}") in
-    C.Mdlog.run_parallel ~retries:1 md "push" cmd args >>= fun jobs ->
-    Ok ()
+    if push then begin
+      let cmd = C.Docker.push_cmd (gen_tag "{}") in
+      C.Mdlog.run_parallel ~retries:1 md "push" cmd args
+    end else Ok ()
 
   (* Push multiarch images to the Hub for base opam binaries *)
   let phase2 hub_id build_dir logs_dir () =
@@ -222,7 +223,7 @@ module Phases = struct
     Ok ()
 
   (* Generate an opam archive suitable for pointing local builds at *)
-  let phase3_archive cache hub_id build_dir logs_dir () =
+  let phase3_archive cache push hub_id build_dir logs_dir () =
     setup_log_dirs ~prefix:"phase3-archive" build_dir logs_dir @@ fun build_dir md ->
     G.generate_dockerfile ~crunch:true build_dir (Gen.opam2_mirror hub_id) >>= fun () ->
     Bos.OS.Dir.set_current build_dir >>= fun () -> 
@@ -232,7 +233,7 @@ module Phases = struct
     Ok ()
 
   (* Generate a single container with all the ocaml compilers present *)
-  let phase3_megaocaml cache arch hub_id build_dir logs_dir () =
+  let phase3_megaocaml cache push arch hub_id build_dir logs_dir () =
     let arch_s = arch_to_docker arch in
     let prefix = Fmt.strf "phase3-megaocaml-%s" arch_s in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
@@ -246,7 +247,7 @@ module Phases = struct
     let args = List.map fst d in
     C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun _ -> Ok ()
 
-  let phase3_ocaml cache arch hub_id build_dir logs_dir () =
+  let phase3_ocaml cache push arch hub_id build_dir logs_dir () =
     let arch_s = arch_to_docker arch in
     let prefix = Fmt.strf "phase3-ocaml-%s" arch_s in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
@@ -276,6 +277,10 @@ let cache =
   let doc = "Use Docker caching" in
   Arg.(value & opt bool false & info ["cache"] ~docv:"CACHE" ~doc)
 
+let push =
+  let doc = "Push result of builds to Docker Hub" in
+  Arg.(value & opt bool true & info ["push"] ~docv:"PUSH" ~doc)
+
 let build_dir = 
   let doc = "Directory in which to store build artefacts" in
   Arg.(value & opt fpath (Fpath.v "_build") & info ["b";"build-dir"] ~docv:"BUILD_DIR" ~doc)
@@ -296,7 +301,7 @@ let phase1_cmd =
     `S Manpage.s_description;
     `P "Generate and build base $(b,opam) container images." ]
   in
-  Term.(term_result (const Phases.phase1 $ cache $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
+  Term.(term_result (const Phases.phase1 $ cache $ push $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
   Term.info "phase1" ~doc ~sdocs:Manpage.s_common_options ~exits ~man
 
 let phase2_cmd =
@@ -308,19 +313,19 @@ let phase2_cmd =
 let phase3_archive_cmd =
   let doc = "generate a distribution archive mirror" in
   let exits = Term.default_exits in
-  Term.(term_result (const Phases.phase3_archive $ cache $ hub_id $ build_dir $ logs_dir $ setup_logs)),
+  Term.(term_result (const Phases.phase3_archive $ cache $ push $ hub_id $ build_dir $ logs_dir $ setup_logs)),
   Term.info "phase3-cache" ~doc ~exits
 
 let phase3_megaocaml_cmd =
   let doc = "generate a ocaml compiler container with all the things" in
   let exits = Term.default_exits in
-  Term.(term_result (const Phases.phase3_megaocaml $ cache $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
+  Term.(term_result (const Phases.phase3_megaocaml $ cache $ push $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
   Term.info "phase3-megaocaml" ~doc ~exits
 
 let phase3_ocaml_cmd =
   let doc = "generate a matrix of ocaml compilers" in
   let exits = Term.default_exits in
-  Term.(term_result (const Phases.phase3_ocaml $ cache $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
+  Term.(term_result (const Phases.phase3_ocaml $ cache $ push $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
   Term.info "phase3-ocaml" ~doc ~exits
 
 
