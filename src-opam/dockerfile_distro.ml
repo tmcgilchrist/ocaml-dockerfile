@@ -87,11 +87,11 @@ let master_distro = `Debian `Stable
 
 let stable_ocaml_versions =
   (* TODO move into ocaml-versions *)
-  [ "4.02.3"; "4.03.0"; "4.03.0+flambda";
-    "4.04.2"; "4.04.2+flambda"; "4.05.0"; "4.05.0+flambda";
-    "4.06.0"; "4.06.0+flambda"]
+  [ "4.02.3"; "4.03.0"; "4.03.0";
+    "4.04.2"; "4.04.2"; "4.05.0"; "4.05.0";
+    "4.06.0"; "4.06.0"]
 
-let dev_ocaml_versions = [ "4.07.0"; "4.07.0+flambda" ]
+let dev_ocaml_versions = [ "4.07.0"; "4.07.0" ]
 let all_ocaml_versions = stable_ocaml_versions @ dev_ocaml_versions
 let latest_ocaml_version = "4.05.0"
 let opam_versions = [ "1.2.2" ]
