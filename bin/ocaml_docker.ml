@@ -86,7 +86,7 @@ module Gen = struct
       run "opam init -a /home/opam/opam-repository" @@
       compilers @@
       run "opam switch default" in
-    distro, d
+    (Fmt.strf "%s-ocaml" distro), d
 
   let separate_ocaml_compilers hub_id arch distro =
     D.stable_ocaml_versions |>
@@ -96,7 +96,7 @@ module Gen = struct
         header hub_id (D.tag_of_distro distro) @@
         run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
         run "opam init -a /home/opam/opam-repository -c %s" (D.ocaml_version_to_opam_switch ov) in
-      (Fmt.strf "%s_ocaml-%s" (D.tag_of_distro distro) ov), d
+      (Fmt.strf "%s-ocaml-%s" (D.tag_of_distro distro) ov), d
     )
 
   let gen_opam_for_distro ?labels d =
@@ -200,7 +200,7 @@ module Phases = struct
 
   (* Generate a single container with all the ocaml compilers present *)
   let phase3_megaocaml arch hub_id build_dir logs_dir () =
-    let gen_tag d = Fmt.strf "%s:linux-%s-%s-ocaml" hub_id (arch_to_docker arch) d in
+    let gen_tag d = Fmt.strf "%s:linux-%s-%s" hub_id (arch_to_docker arch) d in
     setup_log_dirs ~prefix:"phase3-megaocaml" build_dir logs_dir @@ fun build_dir logs_dir ->
     let d =
       List.filter (D.distro_supported_on arch) D.active_distros |>
@@ -212,7 +212,7 @@ module Phases = struct
     C.Parallel.run ~retries:1 ~results:logs_dir cmd args >>= fun _ -> Ok ()
 
   let phase3_ocaml arch hub_id build_dir logs_dir () =
-    let gen_tag d = Fmt.strf "%s:linux-%s-%s-ocaml" hub_id (arch_to_docker arch) d in
+    let gen_tag d = Fmt.strf "%s:linux-%s-%s" hub_id (arch_to_docker arch) d in
     setup_log_dirs ~prefix:"phase3-ocaml" build_dir logs_dir @@ fun build_dir logs_dir ->
     let d =
       List.filter (D.distro_supported_on arch) D.active_distros |>
@@ -220,9 +220,7 @@ module Phases = struct
       List.flatten in
     G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
-    let arch_s = arch_to_docker arch in
-    let tag = gen_tag "{}" in
-    let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag (Fpath.v ".") in
+    let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst d in
     C.Parallel.run ~retries:1 ~results:logs_dir cmd args >>= fun _ -> Ok ()
 
