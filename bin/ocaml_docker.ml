@@ -165,7 +165,6 @@ module Phases = struct
 
   let setup_log_dirs ~prefix build_dir logs_dir fn =
     Fpath.(build_dir / prefix) |> fun build_dir ->
-    Fpath.(logs_dir / prefix) |> fun logs_dir ->
     Bos.OS.Dir.create ~path:true build_dir >>= fun _ ->
     Bos.OS.Dir.create ~path:true logs_dir >>= fun _ ->
     let md = C.Mdlog.init ~logs_dir ~prefix ~descr:prefix in (* TODO descr *)
