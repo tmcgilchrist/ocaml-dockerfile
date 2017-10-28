@@ -8,7 +8,6 @@ let arch_to_docker = function
  | `X86_64 -> "amd64"
  | `Aarch64 -> "arm64"
 
-
 module Gen = struct
   open Dockerfile
   open Dockerfile_opam
@@ -109,14 +108,15 @@ module Gen = struct
     )
 
   let gen_opam_for_distro ?labels d =
-    match D.resolve_alias d with
-    | `Alpine v ->
+    let fn =
+     match D.resolve_alias d with
+     | `Alpine v ->
       let tag = match v with
         | `V3_3 -> "3.3" | `V3_4 -> "3.4"
         | `V3_5 -> "3.5" | `V3_6 -> "3.6"
         | `Latest -> assert false in
-      D.tag_of_distro d, (apk_opam2 ?labels ~distro:"alpine" ~tag ())
-    | `Debian v ->
+      apk_opam2 ?labels ~distro:"alpine" ~tag ()
+     | `Debian v ->
       let tag = match v with
         | `V7 -> "7"
         | `V8 -> "8"
@@ -124,7 +124,7 @@ module Gen = struct
         | `Testing -> "testing"
         | `Unstable -> "unstable"
         | `Stable -> assert false in
-      D.tag_of_distro d, (apt_opam2 ?labels ~distro:"debian" ~tag ())
+      apt_opam2 ?labels ~distro:"debian" ~tag ()
     | `Ubuntu v ->
       let tag = match v with
         | `V12_04 -> "precise"
@@ -134,29 +134,30 @@ module Gen = struct
         | `V17_04 -> "zesty"
         | `V17_10 -> "artful"
         | _ -> assert false in
-      D.tag_of_distro d, (apt_opam2 ?labels ~distro:"ubuntu" ~tag ())
+      apt_opam2 ?labels ~distro:"ubuntu" ~tag ()
    | `CentOS v ->
       let tag = match v with
         | `V6 -> "6"
         | `V7 -> "7"
         | _ -> assert false in
-      D.tag_of_distro d, (yum_opam2 ?labels ~distro:"centos" ~tag ())
+      yum_opam2 ?labels ~distro:"centos" ~tag ()
    | `Fedora v ->
       let tag = match v with
         | `V21 -> "21" | `V22 -> "22" | `V23 -> "23" | `V24 -> "24"
         | `V25 -> "25" | `V26 -> "26"
         | _ -> assert false in
-      D.tag_of_distro d, (yum_opam2 ?labels ~distro:"fedora" ~tag ())
+      yum_opam2 ?labels ~distro:"fedora" ~tag ()
    | `OracleLinux v ->
       let tag = match v with
         | `V7 -> "7" 
         | _ -> assert false in
-      D.tag_of_distro d, (yum_opam2 ?labels ~distro:"oraclelinux" ~tag ())
+      yum_opam2 ?labels ~distro:"oraclelinux" ~tag ()
    | `OpenSUSE v ->
       let tag = match v with
         | `V42_1 -> "42.1"  | `V42_2 -> "42.2" | `V42_3 -> "42.3"
         | _ -> assert false in
-      D.tag_of_distro d, (zypper_opam2 ?labels ~distro:"opensuse" ~tag ())
+      zypper_opam2 ?labels ~distro:"opensuse" ~tag ()
+   in (D.tag_of_distro d), fn
 
    let multiarch_manifest ~target ~platforms =
      let ms =

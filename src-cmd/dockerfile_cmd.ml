@@ -178,7 +178,7 @@ end
 module Mdlog = struct
 
   type cmd =
-  | Parallel of {label:string; args:string list } [@@deriving sexp]
+  {label:string; args:string list } [@@deriving sexp]
   
   type cmds = cmd list [@@deriving sexp]
 
@@ -196,7 +196,7 @@ module Mdlog = struct
     (* TODO still log on failure *)
     let logs_dir = Fpath.(t.logs_dir) in
     Parallel.run ?retries ?delay logs_dir label cmd args >>= fun jobs ->
-    t.cmds <- Parallel {label; args} :: t.cmds;
+    t.cmds <- {label; args} :: t.cmds;
     Ok ()
 
   let output t =
