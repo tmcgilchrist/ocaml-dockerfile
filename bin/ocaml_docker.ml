@@ -62,7 +62,8 @@ module Gen = struct
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.Zypper.add_user ~sudo:true "opam" @@
-    L.Git.init ()
+    L.Git.init () @@
+    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
   (* Generate archive mirror *)
   let opam2_mirror (hub_id:string) =
