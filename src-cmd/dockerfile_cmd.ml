@@ -131,7 +131,7 @@ module Parallel = struct
     let delay =
       match delay with
       | None -> empty
-      | Some d -> v "--delay" % string_of_float d in
+      | Some d -> v "--delay" % (Fmt.strf "%.2f" d) in
     let joblog =
       match results with
       | None -> empty
