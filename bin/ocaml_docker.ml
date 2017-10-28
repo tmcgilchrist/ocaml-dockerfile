@@ -85,7 +85,7 @@ module Gen = struct
       List.map (run "opam switch create %s") |> (@@@) empty in
     let d = 
       header hub_id (Fmt.strf "%s-opam" distro) @@
-      run "git -C /home/opam/opam-repository pull origin master" @@
+      run "cd /home/opam/opam-repository && git pull origin master" @@
       run "opam init -a /home/opam/opam-repository" @@
       compilers @@
       run "opam switch default" in
@@ -98,7 +98,7 @@ module Gen = struct
     List.map (fun ov ->
       let d = 
         header hub_id (Fmt.strf "%s-opam" distro) @@
-        run "git -C /home/opam/opam-repository pull origin master" @@
+        run "cd /home/opam/opam-repository && git pull origin master" @@
         run "opam init -a /home/opam/opam-repository -c %s" (D.ocaml_version_to_opam_switch ov) in
       (Fmt.strf "%s-ocaml-%s" distro (D.tag_of_ocaml_version ov)), d
     )
