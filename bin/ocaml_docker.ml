@@ -8,13 +8,6 @@ module G = Dockerfile_gen
 module Gen = struct
   open Dockerfile
   open Dockerfile_opam
-  (* Build the OPAM distributions from the OCaml base *)
-  let add_comment ?compiler_version tag =
-    comment "OPAM for %s with %s" tag
-      (match compiler_version with
-       | None -> "system OCaml compiler"
-       | Some v -> "local switch of OCaml " ^ v)
-
   (* Apk based Dockerfile *)
   let apk_opam2 ?(labels=[]) ~distro ~tag () =
     header distro tag @@
