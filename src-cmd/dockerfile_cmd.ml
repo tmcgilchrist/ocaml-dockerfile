@@ -121,13 +121,17 @@ module Parallel = struct
   type t = joblog list [@@deriving sexp]
   let bin = Cmd.(v "parallel")
 
-  let run_cmd ?retries ?results cmd args =
+  let run_cmd ?delay ?retries ?results cmd args =
     let open Cmd in
     let args = of_list args in
     let retries =
       match retries with
       | None -> empty
       | Some r -> v "--retries" % string_of_int r in
+    let delay =
+      match delay with
+      | None -> empty
+      | Some d -> v "--delay" % string_of_float d in
     let joblog =
       match results with
       | None -> empty
@@ -136,11 +140,11 @@ module Parallel = struct
       match results with
       | None -> empty
       | Some r -> v "--results" % p r in
-    bin % "--no-notice" %% retries %% joblog %% results %% cmd % ":::" %% args
+    bin % "--no-notice" %% retries %% joblog %% delay %% results %% cmd % ":::" %% args
 
-  let run ?retries ?results cmd args =
+  let run ?delay ?retries ?results cmd args =
     let open Rresult.R.Infix in
-    let t = run_cmd ?retries ?results cmd args in
+    let t = run_cmd ?delay ?retries ?results cmd args in
     run_out t >>= fun _ ->
     match results with
     | None -> R.ok []

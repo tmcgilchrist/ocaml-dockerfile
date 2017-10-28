@@ -223,7 +223,7 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     let args = List.map fst d in
-    C.Parallel.run ~retries:1 ~results:logs_dir cmd args >>= fun _ -> Ok ()
+    C.Parallel.run ~delay:5.0 ~retries:1 ~results:logs_dir cmd args >>= fun _ -> Ok ()
 
 end
 
