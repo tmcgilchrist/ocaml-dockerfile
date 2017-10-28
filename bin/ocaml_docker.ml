@@ -20,7 +20,8 @@ module Gen = struct
     copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.Apk.install "build-base tar ca-certificates git rsync curl sudo" @@ 
     L.Apk.add_user ~sudo:true "opam" @@
-    L.Git.init ()
+    L.Git.init () @@
+    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
   (* Debian based Dockerfile *)
   let apt_opam2 ?(labels=[]) ~distro ~tag () =
@@ -32,7 +33,8 @@ module Gen = struct
     copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.Apt.install "build-essential curl git rsync sudo unzip" @@
-    L.Git.init ()
+    L.Git.init () @@
+    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
   (* RPM based Dockerfile *)
   let yum_opam2 ?(labels=[]) ~distro ~tag () =
@@ -47,7 +49,8 @@ module Gen = struct
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.RPM.add_user ~sudo:true "opam" @@ (** TODO pin uid at 1000 *)
-    L.Git.init ()
+    L.Git.init () @@
+    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
   (* Zypper based Dockerfile *)
   let zypper_opam2 ?(labels=[]) ~distro ~tag () =
@@ -64,10 +67,10 @@ module Gen = struct
 
   (* Generate archive mirror *)
   let opam2_mirror (hub_id:string) =
-    header hub_id "alpine-3.6" @@
+    header hub_id "alpine-3.6-opam" @@
     run "sudo apk add --update bash m4" @@
-    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
     workdir "/home/opam/opam-repository" @@
+    run "git pull origin master" @@
     run "opam admin upgrade" @@
     run "opam admin cache" @@
     run "opam init -a /home/opam/opam-repository" @@
@@ -82,7 +85,7 @@ module Gen = struct
       List.map (run "opam switch create %s") |> (@@@) empty in
     let d = 
       header hub_id (Fmt.strf "%s-opam" distro) @@
-      run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
+      run "git -C /home/opam/opam-repository pull origin master" @@
       run "opam init -a /home/opam/opam-repository" @@
       compilers @@
       run "opam switch default" in
@@ -95,7 +98,7 @@ module Gen = struct
     List.map (fun ov ->
       let d = 
         header hub_id (Fmt.strf "%s-opam" distro) @@
-        run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
+        run "git -C /home/opam/opam-repository pull origin master" @@
         run "opam init -a /home/opam/opam-repository -c %s" (D.ocaml_version_to_opam_switch ov) in
       (Fmt.strf "%s-ocaml-%s" distro ov), d
     )
