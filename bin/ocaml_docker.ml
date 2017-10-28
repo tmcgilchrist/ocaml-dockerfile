@@ -73,7 +73,7 @@ module Gen = struct
     run "opam init -a /home/opam/opam-repository" @@
     run "opam install -yj4 cohttp-lwt-unix"
 
-  let ocaml_compilers hub_id arch distro =
+  let all_ocaml_compilers hub_id arch distro =
     let distro = D.tag_of_distro distro in
     let compilers =
       D.stable_ocaml_versions |>
@@ -87,6 +87,17 @@ module Gen = struct
       compilers @@
       run "opam switch default" in
     distro, d
+
+  let separate_ocaml_compilers hub_id arch distro =
+    D.stable_ocaml_versions |>
+    List.filter (D.ocaml_supported_on arch) |>
+    List.map (fun ov ->
+      let d = 
+        header hub_id (D.tag_of_distro distro) @@
+        run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
+        run "opam init -a /home/opam/opam-repository -c %s" (D.ocaml_version_to_opam_switch ov) in
+      (Fmt.strf "%s_ocaml-%s" (D.tag_of_distro distro) ov), d
+    )
 
   let gen_opam_for_distro ?labels d =
     match D.resolve_alias d with
@@ -158,7 +169,7 @@ module Phases = struct
 
   (* Generate base opam binaries for all distros *)
   let phase1 arch hub_id build_dir logs_dir () =
-    let gen_tag = Fmt.strf "%s:linux-%s-opam-%s" hub_id (arch_to_docker arch) in
+    let gen_tag d = Fmt.strf "%s:linux-%s-%s-opam" hub_id d (arch_to_docker arch) in
     setup_log_dirs ~prefix:"phase1" build_dir logs_dir @@ fun build_dir logs_dir ->
     List.filter (D.distro_supported_on arch) D.active_distros |>
     List.map Gen.gen_opam_for_distro |> fun ds ->
@@ -166,7 +177,6 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     C.Parallel.run ~retries:1 ~results:logs_dir cmd (List.map fst ds) >>= fun jobs ->
-    Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.sexp_of_t jobs)));
     CU.iter (fun job -> gen_tag job.C.Parallel.Joblog.arg |> C.Docker.push_cmd |> C.run_log logs_dir "parallel") jobs
 
   (* Push multiarch images to the Hub for base opam binaries *)
@@ -175,8 +185,8 @@ module Phases = struct
     CU.iter (fun distro ->
       let arches = D.distro_arches distro in
       let platforms = List.map (fun a -> Fmt.strf "linux/%s" (arch_to_docker a)) arches in
-      let template = Fmt.strf "%s:OS-ARCH-opam-%s" hub_id (D.tag_of_distro distro) in
-      let target = Fmt.strf "%s:%s" hub_id (D.tag_of_distro distro) in
+      let template = Fmt.strf "%s:OS-ARCH-%s-opam" hub_id (D.tag_of_distro distro) in
+      let target = Fmt.strf "%s:%s-opam" hub_id (D.tag_of_distro distro) in
       C.Docker.manifest_push ~platforms ~template ~target |> C.run_log logs_dir "push"
     ) D.active_distros
 
@@ -189,11 +199,11 @@ module Phases = struct
 
   (* Generate a single container with all the ocaml compilers present *)
   let phase3_megaocaml arch hub_id build_dir logs_dir () =
-    let gen_tag d = Fmt.strf "%s:linux-%s-ocaml-all-%s" hub_id (arch_to_docker arch) d in
+    let gen_tag d = Fmt.strf "%s:linux-%s-%s-ocaml" hub_id (arch_to_docker arch) d in
     setup_log_dirs ~prefix:"phase3-megaocaml" build_dir logs_dir @@ fun build_dir logs_dir ->
     let d =
       List.filter (D.distro_supported_on arch) D.active_distros |>
-      List.map (Gen.ocaml_compilers hub_id arch) in
+      List.map (Gen.all_ocaml_compilers hub_id arch) in
     G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
@@ -204,11 +214,11 @@ module Phases = struct
     setup_log_dirs ~prefix:"phase3-ocaml" build_dir logs_dir @@ fun build_dir logs_dir ->
     let d =
       List.filter (D.distro_supported_on arch) D.active_distros |>
-      List.map (Gen.ocaml_compilers hub_id arch) in
+      List.map (Gen.separate_ocaml_compilers hub_id arch) |>
+      List.flatten in
     G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let arch_s = arch_to_docker arch in
-    let gen_tag d = Fmt.strf "%s:linux-%s-ocaml-all-%s" hub_id arch_s d in
     let tag = gen_tag "{}" in
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst d in
