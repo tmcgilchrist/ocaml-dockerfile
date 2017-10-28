@@ -75,7 +75,11 @@ module Gen = struct
 
   let ocaml_compilers hub_id arch distro =
     let distro = D.tag_of_distro distro in
-    let compilers = D.stable_ocaml_versions |> List.filter (D.ocaml_supported_on arch) |> List.map (run "opam switch create %s") |> (@@@) empty in
+    let compilers =
+      D.stable_ocaml_versions |>
+      List.filter (D.ocaml_supported_on arch) |>
+      List.map D.ocaml_version_to_opam_switch |>
+      List.map (run "opam switch create %s") |> (@@@) empty in
     let d = 
       header hub_id distro @@
       run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
@@ -163,16 +167,17 @@ module Phases = struct
     let cmd = C.Docker.build_cmd ~cache:false ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     C.Parallel.run ~retries:1 ~results:logs_dir cmd (List.map fst ds) >>= fun jobs ->
     Logs.debug (fun l -> l "joblog: %s" (Sexplib.Sexp.to_string_hum (C.Parallel.sexp_of_t jobs)));
-    CU.iter (fun job -> gen_tag job.C.Parallel.Joblog.arg |> C.Docker.push_cmd |> Bos.OS.Cmd.run) jobs
+    CU.iter (fun job -> gen_tag job.C.Parallel.Joblog.arg |> C.Docker.push_cmd |> C.run_log logs_dir "parallel") jobs
 
   (* Push multiarch images to the Hub for base opam binaries *)
-  let phase2 hub_id () =
+  let phase2 hub_id build_dir logs_dir () =
+    setup_log_dirs ~prefix:"phase2" build_dir logs_dir @@ fun build_dir logs_dir ->
     CU.iter (fun distro ->
       let arches = D.distro_arches distro in
       let platforms = List.map (fun a -> Fmt.strf "linux/%s" (arch_to_docker a)) arches in
       let template = Fmt.strf "%s:OS-ARCH-opam-%s" hub_id (D.tag_of_distro distro) in
       let target = Fmt.strf "%s:%s" hub_id (D.tag_of_distro distro) in
-      C.Docker.manifest_push ~platforms ~template ~target |> Bos.OS.Cmd.run
+      C.Docker.manifest_push ~platforms ~template ~target |> C.run_log logs_dir "push"
     ) D.active_distros
 
   (* Generate an opam archive suitable for pointing local builds at *)
@@ -180,7 +185,7 @@ module Phases = struct
     setup_log_dirs ~prefix:"phase3-archive" build_dir logs_dir @@ fun build_dir logs_dir ->
     G.generate_dockerfile ~crunch:true build_dir (Gen.opam2_mirror hub_id) >>= fun () ->
     Bos.OS.Dir.set_current build_dir >>= fun () -> 
-    C.Docker.build_cmd ~cache:false ~tag:"opam2-archive" (Fpath.v ".") |> Bos.OS.Cmd.run
+    C.Docker.build_cmd ~cache:false ~tag:"opam2-archive" (Fpath.v ".") |> C.run_log logs_dir "archive"
 
   (* Generate a single container with all the ocaml compilers present *)
   let phase3_megaocaml arch hub_id build_dir logs_dir () =
@@ -247,7 +252,7 @@ let phase1_cmd =
 let phase2_cmd =
   let doc = "combine opam container images into multiarch versions" in
   let exits = Term.default_exits in
-  Term.(term_result (const Phases.phase2 $ hub_id $ setup_logs)),
+  Term.(term_result (const Phases.phase2 $ hub_id $ build_dir $ logs_dir $ setup_logs)),
   Term.info "phase2" ~doc ~exits
 
 let phase3_archive_cmd =

@@ -19,6 +19,16 @@ end
 
 open Utils
 
+let run_log ?env log_dir name cmd =
+  let err = OS.Cmd.err_file Fpath.(log_dir / (name ^ ".err")) in
+  OS.Cmd.run_out ?env ~err cmd |>
+  OS.Cmd.out_file Fpath.(log_dir / (name ^ ".out")) >>= fun ((), (_,status)) ->
+  match status with
+  |`Signaled n ->
+     R.error_msg (Fmt.strf "Signal %d" n)
+  |`Exited code ->
+     OS.File.write Fpath.(log_dir / (name ^ ".exitcode")) (string_of_int code)
+  
 (** Docker *)
 module Docker = struct
   let bin = Cmd.(v "docker")

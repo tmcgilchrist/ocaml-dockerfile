@@ -408,6 +408,13 @@ let centos6_modern_git =
     run "rm -f rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
     run "yum -y --disablerepo=base,updates --enablerepo=rpmforge-extras update git"
 
+let ocaml_version_to_opam_switch = function
+  |"4.06.0" -> "4.06.0+trunk"
+  |"4.06.0+flambda" -> "4.06.0+trunk+flambda"
+  |"4.07.0" -> "4.07.0+trunk"
+  |"4.07.0+flambda" -> "4.07.0+trunk+flambda"
+  |ov -> ov
+ 
 (* Construct a Dockerfile for a distro/ocaml combo, using the
    system OCaml if possible, or a custom OPAM switch otherwise *)
 let to_dockerfile ?pin ?(opam_version=latest_opam_version) ~ocaml_version ~distro () =
@@ -422,12 +429,7 @@ let to_dockerfile ?pin ?(opam_version=latest_opam_version) ~ocaml_version ~distr
   let tag = tag_of_distro distro in
   let compiler_version =
     (* Rewrite the dev version to add a +trunk tag. *)
-    let ocaml_version =
-      match ocaml_version with
-      |"4.07.0" -> "4.06.0+trunk"
-      |"4.07.0+flambda" -> "4.06.0+trunk+flambda"
-      |_ -> ocaml_version
-    in
+    let ocaml_version = ocaml_version_to_opam_switch ocaml_version in
     match builtin_ocaml_of_distro distro with
     | Some v when v = ocaml_version -> None (* use builtin *)
     | None | Some _ (* when v <> ocaml_version *) -> Some ocaml_version

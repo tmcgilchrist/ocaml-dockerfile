@@ -96,6 +96,9 @@ val opam_tag_of_distro : t -> string -> string
   the OS/OCaml combination.  They can be found by default in
   the [ocaml] organisation in Docker Hub. *)
 
+val ocaml_version_to_opam_switch : string -> string
+(* TODO *)
+
 val latest_tag_of_distro : t -> string
 (** [latest_tag_of_dsistro distro] will generate a Docker Hub
   tag that is a convenient short form for the latest stable
