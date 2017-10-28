@@ -5,12 +5,42 @@ open Astring
 open R.Infix
 module OC = OS.Cmd
 
+module Mdlog = struct
+  type cmd =
+  | Cmd of {label: string}
+  | Parallel of {label: string; args: string }
+  [@@deriving sexp]
+  
+  type cmds = cmd list [@@deriving sexp]
+  type t = {
+    mutable cmds: cmds;
+    logs_dir: Fpath.t;
+    prefix: string;
+    descr: string;
+  }
+  
+  let init ~logs_dir ~prefix ~descr =
+    { cmds=[]; logs_dir; prefix; descr }
+
+  let add_cmd t label =
+    t.cmds <- Cmd {label} :: t.cmds
+
+  let add_parallel t label args =
+    t.cmds <- Parallel {label; args} :: t.cmds
+
+  let output t =
+    Logs.info (fun l -> l "%s" (Sexplib.Sexp.to_string_hum (sexp_of_cmds t.cmds)));
+    Ok ()
+end
+
 let rec iter fn l =
   match l with
   | hd::tl -> fn hd >>= fun () -> iter fn tl
   | [] -> Ok ()
 
-let run_log ?env log_dir name cmd =
+let run_log ?env md name cmd =
+  let log_dir = md.Mdlog.logs_dir in
+  Mdlog.add_cmd md name; 
   let err = OS.Cmd.err_file Fpath.(log_dir / (name ^ ".err")) in
   OS.Cmd.run_out ?env ~err cmd |>
   OS.Cmd.out_file Fpath.(log_dir / (name ^ ".out")) >>= fun ((), (_,status)) ->
@@ -21,7 +51,7 @@ let run_log ?env log_dir name cmd =
      R.error_msg (Fmt.strf "Signal %d" n)
   |`Exited 0 -> write_exit 0 >>= fun () -> Ok ()
   |`Exited code -> write_exit code >>= fun () -> R.error_msg (Fmt.strf "exit code %d" code)
-  
+
 (** Docker *)
 module Docker = struct
   let bin = Cmd.(v "docker")
@@ -133,10 +163,11 @@ module Parallel = struct
       | Some r -> v "--results" % p r in
     bin % "--no-notice" %% retries %% joblog %% delay %% results %% cmd % ":::" %% args
 
-  let run ?delay ?retries ?results log_dir label cmd args =
-    let open Rresult.R.Infix in
+  let run ?delay ?retries md label cmd args =
+    let logs_dir = md.Mdlog.logs_dir in
+    let results = Some logs_dir in
     let t = run_cmd ?delay ?retries ?results cmd args in
-    run_log log_dir label t >>= fun _ ->
+    run_log md label t >>= fun _ ->
     match results with
     | None -> R.ok []
     | Some f ->
