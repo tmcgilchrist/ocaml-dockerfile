@@ -200,6 +200,7 @@ module Phases = struct
   let phase2 hub_id build_dir logs_dir () =
     setup_log_dirs ~prefix:"phase2" build_dir logs_dir @@ fun build_dir md ->
     (* Generate yaml files *)
+    let yaml_file tag = Fpath.(build_dir / (tag ^ ".yml")) in
     let yamls =
       List.map (fun distro ->
         let tag = D.tag_of_distro distro in
@@ -211,12 +212,11 @@ module Phases = struct
             let image = Fmt.strf "%s:linux-%s-%s-opam" hub_id tag arch in
             image, arch) in
         Gen.multiarch_manifest ~target ~platforms |> fun m ->
-        let fname = Fpath.(build_dir / (tag ^ ".yml")) in
-        fname, m
+        tag, m
       ) D.active_distros in
-    C.iter (fun (f,m) -> Bos.OS.File.write f m) yamls >>= fun () ->
-    let cmd = C.Docker.manifest_push_file Fpath.(v "{}") in
-    let args = List.map (fun (f,_) -> Fpath.to_string f) yamls in
+    C.iter (fun (t,m) -> Bos.OS.File.write (yaml_file t) m) yamls >>= fun () ->
+    let cmd = C.Docker.manifest_push_file (yaml_file "{}") in
+    let args = List.map (fun (t,_) -> t) yamls in
     C.Mdlog.run_parallel ~retries:1 md "manifest" cmd args >>= fun _ ->
     Ok ()
 
