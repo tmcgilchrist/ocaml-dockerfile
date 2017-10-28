@@ -175,7 +175,8 @@ module Phases = struct
 
   (* Generate base opam binaries for all distros *)
   let phase1 cache arch hub_id build_dir logs_dir () =
-    let gen_tag d = Fmt.strf "%s:linux-%s-%s-opam" hub_id d (arch_to_docker arch) in
+    let arch_s = arch_to_docker arch in
+    let gen_tag d = Fmt.strf "%s:linux-%s-%s-opam" hub_id d arch_s in
     setup_log_dirs ~prefix:"phase1" build_dir logs_dir @@ fun build_dir md ->
     List.filter (D.distro_supported_on arch) D.active_distros |>
     List.map Gen.gen_opam_for_distro |> fun ds ->
@@ -184,8 +185,8 @@ module Phases = struct
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
     C.Parallel.run ~retries:1 md "build" cmd (List.map fst ds) >>= fun jobs ->
     C.iter (fun job ->
-      gen_tag job.C.Parallel.Joblog.arg |> fun tag ->
-      C.Docker.push_cmd tag |> C.run_log md (Fmt.strf "push-%s" tag)
+      gen_tag job.C.Parallel.Joblog.arg |>
+      C.Docker.push_cmd |> C.run_log md (Fmt.strf "push-%s-%s" job.C.Parallel.Joblog.arg arch_s)
     ) jobs
 
   (* Push multiarch images to the Hub for base opam binaries *)
