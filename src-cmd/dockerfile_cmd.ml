@@ -191,7 +191,7 @@ module Mdlog = struct
 
   let run_parallel ?retries ?delay t label cmd args =
     (* TODO still log on failure *)
-    let logs_dir = Fpath.(t.logs_dir / t.prefix) in
+    let logs_dir = Fpath.(t.logs_dir) in
     Parallel.run ?retries ?delay logs_dir label cmd args >>= fun jobs ->
     t.cmds <- Parallel {label; args} :: t.cmds;
     Ok ()
