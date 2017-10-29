@@ -293,6 +293,34 @@ module Phases = struct
       let cmd = C.Docker.push_cmd tag in
       C.Mdlog.run_parallel ~retries:1 md "02-push" cmd args
     end else Ok ()
+
+  (* Push multiarch images to the Hub for ocaml binaries *)
+  let phase4 hub_id build_dir logs_dir () =
+    setup_log_dirs ~prefix:"phase4" build_dir logs_dir @@ fun build_dir md ->
+    let yaml_file tag = Fpath.(build_dir / (tag ^ ".yml")) in
+    let yamls =
+      List.map (fun distro ->
+        let tag = D.tag_of_distro distro in
+        (* Get all the supported OCaml compilers for this distro *)
+        List.map (fun ov ->
+          let target = Fmt.strf "%s:%s-ocaml-%s" hub_id tag ov in
+          let platforms =
+            D.distro_arches distro |>
+            List.filter (fun a -> Ocaml_version.(Has.arch a (of_string ov))) |>
+            List.map (fun arch ->
+              let arch = arch_to_docker arch in
+              let image = Fmt.strf "%s:%s-ocaml-%s-linux-%s" hub_id tag ov arch in
+              image, arch)
+          in
+          let tag = Fmt.strf "%s-ocaml-%s" tag ov in
+          Gen.multiarch_manifest ~target ~platforms |> fun m ->
+          tag,m
+        ) D.stable_ocaml_versions
+      ) D.active_distros |> List.flatten in
+    C.iter (fun (t,m) -> Bos.OS.File.write (yaml_file t) m) yamls >>= fun () ->
+    let cmd = C.Docker.manifest_push_file (yaml_file "{}") in
+    let args = List.map (fun (t,_) -> t) yamls in
+    C.Mdlog.run_parallel ~retries:1 md "01-manifest" cmd args
 end
 
 open Cmdliner
@@ -360,6 +388,11 @@ let phase3_ocaml_cmd =
   Term.(term_result (const Phases.phase3_ocaml $ cache $ push $ arch $ hub_id $ build_dir $ logs_dir $ setup_logs)),
   Term.info "phase3-ocaml" ~doc ~exits
 
+let phase4_cmd =
+  let doc = "combine ocaml container images into multiarch versions" in
+  let exits = Term.default_exits in
+  Term.(term_result (const Phases.phase4 $ hub_id $ build_dir $ logs_dir $ setup_logs)),
+  Term.info "phase4" ~doc ~exits
 
 let default_cmd =
   let doc = "build and push opam and OCaml multiarch container images" in
@@ -367,6 +400,6 @@ let default_cmd =
   Term.(ret (const (fun _ -> `Help (`Pager, None)) $ pure ())),
   Term.info "obi-docker" ~version:"v1.0.0" ~doc ~sdocs
 
-let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_megaocaml_cmd; phase3_ocaml_cmd]
+let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_megaocaml_cmd; phase3_ocaml_cmd; phase4_cmd]
 let () = Term.(exit @@ eval_choice default_cmd cmds)
 

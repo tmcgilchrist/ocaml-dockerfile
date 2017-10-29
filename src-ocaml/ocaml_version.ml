@@ -41,10 +41,10 @@ let compare {major; minor; patch; extra} a =
 
 let t = of_string Sys.ocaml_version
 
+type arch = [`X86_64 | `Aarch64 ]
 module Since = struct
   let bytes = of_string "4.03.0"
-  type arch = [`X86_64 | `Aarch64 ]
-  let arch_supported (a:arch) =
+  let arch (a:arch) =
     match a with
     | `Aarch64 -> of_string "4.02.0"
     | `X86_64 -> of_string "3.07.0" (* TODO probably earlier *)
@@ -53,6 +53,11 @@ end
 module Has = struct
   let bytes v =
     match compare Since.bytes v with
+    |(-1) | 0 -> true
+    |n -> false
+
+  let arch (a:arch) v =
+    match compare (Since.arch a) v with
     |(-1) | 0 -> true
     |n -> false
 end
