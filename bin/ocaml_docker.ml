@@ -12,9 +12,10 @@ module Log_gen = struct
 
   let phases = [ "phase1-arm64"; "phase1-amd64"; "phase2" ]
   
-  let render_joblog j =
-    C.Parallel.Joblog.v j |>
+  let render_joblog f =
     let open C.Parallel.Joblog in
+    v f |>
+    List.map (fun j ->
     let result =
       if j.exit_code = 0 then "ok" else "fail"
     in
@@ -25,6 +26,7 @@ module Log_gen = struct
         <div class=\"joblog_runtime\">(%.02fs)</div>
       </div>
     " result j.command j.arg j.run_time
+    )
 end
 
 module Gen = struct
@@ -210,11 +212,11 @@ module Phases = struct
     List.map Gen.gen_opam_for_distro |> fun ds ->
     G.generate_dockerfiles ~crunch:true build_dir ds >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
-    let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:(gen_tag "{}") (Fpath.v ".") in
+    let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst ds in
     C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun jobs ->
     if push then begin
-      let cmd = C.Docker.push_cmd (gen_tag "{}") in
+      let cmd = C.Docker.push_cmd tag in
       C.Mdlog.run_parallel ~retries:1 md "push" cmd args
     end else Ok ()
 
