@@ -247,8 +247,8 @@ module Phases = struct
   let phase3_archive cache push hub_id build_dir logs_dir () =
     setup_log_dirs ~prefix:"phase3-archive" build_dir logs_dir @@ fun build_dir md ->
     G.generate_dockerfile ~crunch:true build_dir (Gen.opam2_mirror hub_id) >>= fun () ->
-    Bos.OS.Dir.set_current build_dir >>= fun () -> 
-    let cmd = C.Docker.build_cmd ~cache ~tag:"{}" (Fpath.v ".") in
+    let dockerfile = Fpath.(build_dir / "Dockerfile") in
+    let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:"{}" (Fpath.v ".") in
     let args = ["opam2-archive"] in
     C.Mdlog.run_parallel ~retries:1 md "archive" cmd args >>= fun _ ->
     Ok ()
