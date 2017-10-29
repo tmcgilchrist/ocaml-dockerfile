@@ -97,9 +97,9 @@ module Gen = struct
     workdir "/home/opam/opam-repository" @@
     run "git pull origin master" @@
     run "opam admin upgrade" @@
-    run "opam admin cache" @@
     run "opam init -a /home/opam/opam-repository" @@
-    run "opam install -yj4 cohttp-lwt-unix"
+    run "opam install -yj4 cohttp-lwt-unix" @@
+    run "opam admin cache"
 
   let all_ocaml_compilers hub_id arch distro =
     let distro = D.tag_of_distro distro in
