@@ -205,7 +205,7 @@ module Phases = struct
     let arch_s = arch_to_docker arch in
     let prefix = Fmt.strf "phase1-%s" arch_s in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
-    let gen_tag d = Fmt.strf "%s:linux-%s-%s-opam" hub_id d arch_s in
+    let tag = Fmt.strf "%s:{}-opam-linux-%s" hub_id arch_s in
     List.filter (D.distro_supported_on arch) D.active_distros |>
     List.map Gen.gen_opam_for_distro |> fun ds ->
     G.generate_dockerfiles ~crunch:true build_dir ds >>= fun () ->
@@ -230,7 +230,7 @@ module Phases = struct
           D.distro_arches distro |>
           List.map (fun arch ->
             let arch = arch_to_docker arch in
-            let image = Fmt.strf "%s:linux-%s-%s-opam" hub_id tag arch in
+            let image = Fmt.strf "%s:%s-opam-linux-%s" hub_id tag arch in
             image, arch) in
         Gen.multiarch_manifest ~target ~platforms |> fun m ->
         tag, m
@@ -261,7 +261,7 @@ module Phases = struct
       List.map (Gen.all_ocaml_compilers hub_id arch) in
     G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
-    let tag = Fmt.strf "%s:linux-{}-%s" hub_id arch_s in
+    let tag = Fmt.strf "%s:{}-linux-%s" hub_id arch_s in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst d in
     C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun () ->
@@ -280,7 +280,7 @@ module Phases = struct
       List.flatten in
     G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
-    let tag = Fmt.strf "%s:linux-{}-%s" hub_id arch_s in
+    let tag = Fmt.strf "%s:{}-linux-%s" hub_id arch_s in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst d in
     C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "build" cmd args >>= fun () ->
@@ -288,7 +288,6 @@ module Phases = struct
       let cmd = C.Docker.push_cmd tag in
       C.Mdlog.run_parallel ~retries:1 md "push" cmd args
     end else Ok ()
-
 end
 
 open Cmdliner
