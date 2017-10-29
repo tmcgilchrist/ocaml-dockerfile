@@ -46,7 +46,7 @@ module Since = struct
   let bytes = of_string "4.03.0"
   let arch (a:arch) =
     match a with
-    | `Aarch64 -> of_string "4.02.0"
+    | `Aarch64 -> of_string "4.03.0"
     | `X86_64 -> of_string "3.07.0" (* TODO probably earlier *)
 end
 

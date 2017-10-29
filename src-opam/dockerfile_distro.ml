@@ -119,6 +119,7 @@ let ocaml_arches ov : arch list =
      [ `X86_64; `Aarch64 ]
   | _ -> failwith "unknown ocaml version for ocaml_arches"
 
+(* TODO remove duplication with ocaml_version library *)
 let ocaml_supported_on (a:arch) ov =
   List.mem a (ocaml_arches ov)
 
