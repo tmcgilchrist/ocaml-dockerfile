@@ -250,8 +250,11 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:"{}" (Fpath.v ".") in
     let args = ["opam2-archive"] in
-    C.Mdlog.run_parallel ~retries:1 md "archive" cmd args >>= fun _ ->
-    Ok ()
+    C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun () ->
+    if push then begin
+      let cmd = C.Docker.push_cmd "{}" in
+      C.Mdlog.run_parallel ~retries:1 md "push" cmd args
+    end else Ok ()
 
   (* Generate a single container with all the ocaml compilers present *)
   let phase3_megaocaml cache push arch hub_id build_dir logs_dir () =
