@@ -242,10 +242,15 @@ module Phases = struct
       List.map (Gen.all_ocaml_compilers hub_id arch) in
     G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
-    let tag = Fmt.strf "%s:linux-%s-{}" hub_id arch_s in
+    let tag = Fmt.strf "%s:linux-{}-%s" hub_id arch_s in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst d in
-    C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun _ -> Ok ()
+    C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun () ->
+    if push then begin
+      let cmd = C.Docker.push_cmd tag in
+      C.Mdlog.run_parallel ~retries:1 md "push" cmd args
+    end else Ok ()
+
 
   let phase3_ocaml cache push arch hub_id build_dir logs_dir () =
     let arch_s = arch_to_docker arch in
@@ -257,10 +262,16 @@ module Phases = struct
       List.flatten in
     G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
-    let tag = Fmt.strf "%s:linux-%s-{}" hub_id arch_s in
+    let tag = Fmt.strf "%s:linux-{}-%s" hub_id arch_s in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst d in
-    C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "build" cmd args >>= fun _ -> Ok ()
+    C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "build" cmd args >>= fun () ->
+    if push then begin
+      let cmd = C.Docker.push_cmd tag in
+      C.Mdlog.run_parallel ~retries:1 md "push" cmd args
+    end else Ok ()
+
+
 end
 
 open Cmdliner
