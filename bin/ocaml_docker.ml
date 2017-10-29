@@ -251,7 +251,6 @@ module Phases = struct
       C.Mdlog.run_parallel ~retries:1 md "push" cmd args
     end else Ok ()
 
-
   let phase3_ocaml cache push arch hub_id build_dir logs_dir () =
     let arch_s = arch_to_docker arch in
     let prefix = Fmt.strf "phase3-ocaml-%s" arch_s in
@@ -270,7 +269,6 @@ module Phases = struct
       let cmd = C.Docker.push_cmd tag in
       C.Mdlog.run_parallel ~retries:1 md "push" cmd args
     end else Ok ()
-
 
 end
 

@@ -116,7 +116,7 @@ module Parallel = struct
   type t = joblog list [@@deriving sexp]
   let bin = Cmd.(v "parallel")
 
-  let run_cmd ?delay ?retries ?results cmd args =
+  let run_cmd ?(joblog="joblog.txt") ?delay ?retries ?results cmd args =
     let open Cmd in
     let args = of_list args in
     let retries =
@@ -130,7 +130,7 @@ module Parallel = struct
     let joblog =
       match results with
       | None -> empty
-      | Some r -> v "--joblog" % p Fpath.(r / "joblog.txt") in
+      | Some r -> v "--joblog" % p Fpath.(r / joblog) in
     let results =
       match results with
       | None -> empty
@@ -139,12 +139,13 @@ module Parallel = struct
 
   let run ?delay ?retries logs_dir label cmd args =
     let results = Some logs_dir in
-    let t = run_cmd ?delay ?retries ?results cmd args in
+    let joblog = Fmt.strf "%s-joblog.txt" label in
+    let t = run_cmd ~joblog ?delay ?retries ?results cmd args in
     run_log logs_dir label t >>= fun _ ->
     match results with
     | None -> R.ok []
     | Some f ->
-       Joblog.v Fpath.(f / "joblog.txt") |>
+       Joblog.v Fpath.(f / joblog) |>
        List.map (fun j ->
          let arg = List.nth args (j.Joblog.seq - 1) in
          let build_logfiles =
