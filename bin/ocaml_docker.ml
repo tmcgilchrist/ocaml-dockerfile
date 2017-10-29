@@ -214,10 +214,10 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst ds in
-    C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun jobs ->
+    C.Mdlog.run_parallel ~retries:1 md "01-build" cmd args >>= fun jobs ->
     if push then begin
       let cmd = C.Docker.push_cmd tag in
-      C.Mdlog.run_parallel ~retries:1 md "push" cmd args
+      C.Mdlog.run_parallel ~retries:1 md "02-push" cmd args
     end else Ok ()
 
   (* Push multiarch images to the Hub for base opam binaries *)
@@ -240,7 +240,7 @@ module Phases = struct
     C.iter (fun (t,m) -> Bos.OS.File.write (yaml_file t) m) yamls >>= fun () ->
     let cmd = C.Docker.manifest_push_file (yaml_file "{}") in
     let args = List.map (fun (t,_) -> t) yamls in
-    C.Mdlog.run_parallel ~retries:1 md "manifest" cmd args >>= fun _ ->
+    C.Mdlog.run_parallel ~retries:1 md "01-manifest" cmd args >>= fun _ ->
     Ok ()
 
   (* Generate an opam archive suitable for pointing local builds at *)
@@ -250,10 +250,10 @@ module Phases = struct
     let dockerfile = Fpath.(build_dir / "Dockerfile") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:"{}" (Fpath.v ".") in
     let args = ["opam2-archive"] in
-    C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun () ->
+    C.Mdlog.run_parallel ~retries:1 md "01-build" cmd args >>= fun () ->
     if push then begin
       let cmd = C.Docker.push_cmd "{}" in
-      C.Mdlog.run_parallel ~retries:1 md "push" cmd args
+      C.Mdlog.run_parallel ~retries:1 md "02-push" cmd args
     end else Ok ()
 
   (* Generate a single container with all the ocaml compilers present *)
@@ -269,10 +269,10 @@ module Phases = struct
     let tag = Fmt.strf "%s:{}-linux-%s" hub_id arch_s in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst d in
-    C.Mdlog.run_parallel ~retries:1 md "build" cmd args >>= fun () ->
+    C.Mdlog.run_parallel ~retries:1 md "01-build" cmd args >>= fun () ->
     if push then begin
       let cmd = C.Docker.push_cmd tag in
-      C.Mdlog.run_parallel ~retries:1 md "push" cmd args
+      C.Mdlog.run_parallel ~retries:1 md "02-push" cmd args
     end else Ok ()
 
   let phase3_ocaml cache push arch hub_id build_dir logs_dir () =
@@ -288,10 +288,10 @@ module Phases = struct
     let tag = Fmt.strf "%s:{}-linux-%s" hub_id arch_s in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst d in
-    C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "build" cmd args >>= fun () ->
+    C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "01-build" cmd args >>= fun () ->
     if push then begin
       let cmd = C.Docker.push_cmd tag in
-      C.Mdlog.run_parallel ~retries:1 md "push" cmd args
+      C.Mdlog.run_parallel ~retries:1 md "02-push" cmd args
     end else Ok ()
 end
 
