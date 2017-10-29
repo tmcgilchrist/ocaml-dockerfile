@@ -3,6 +3,6 @@
 (executables
  ((names (ocaml_docker))
   (public_names (ocaml-docker))
-  (libraries (dockerfile-opam dockerfile-cmd dockerfile-gen))
+  (libraries (dockerfile-opam dockerfile-cmd dockerfile-gen lambdasoup))
   (package dockerfile-cmd)
 ))

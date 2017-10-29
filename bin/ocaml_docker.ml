@@ -8,6 +8,25 @@ let arch_to_docker = function
  | `X86_64 -> "amd64"
  | `Aarch64 -> "arm64"
 
+module Log_gen = struct
+
+  let phases = [ "phase1-arm64"; "phase1-amd64"; "phase2" ]
+  
+  let render_joblog j =
+    C.Parallel.Joblog.v j |>
+    let open C.Parallel.Joblog in
+    let result =
+      if j.exit_code = 0 then "ok" else "fail"
+    in
+    Fmt.strf "
+      <div class=\"joblog\">
+        <div class=\"joblog_result\">%s</div>
+        <div class=\"joblog_arg\">%s %s</div>
+        <div class=\"joblog_runtime\">(%.02fs)</div>
+      </div>
+    " result j.command j.arg j.run_time
+end
+
 module Gen = struct
   open Dockerfile
   open Dockerfile_opam

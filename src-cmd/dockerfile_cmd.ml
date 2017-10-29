@@ -206,7 +206,6 @@ module Mdlog = struct
     Ok ()
 end
 
-
 open Cmdliner
 let setup_logs () =
   let setup_log style_renderer level =
