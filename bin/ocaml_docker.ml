@@ -301,8 +301,18 @@ module Phases = struct
     let yamls =
       List.map (fun distro ->
         let tag = D.tag_of_distro distro in
-        (* Get all the supported OCaml compilers for this distro *)
-        List.map (fun ov ->
+        let mega_ocaml =
+          let target = Fmt.strf "%s:%s-ocaml" hub_id tag in
+          let platforms =
+            D.distro_arches distro |>
+            List.map (fun arch ->
+              let arch = arch_to_docker arch in
+              let image = Fmt.strf "%s:%s-ocaml-linux-%s" hub_id tag arch in
+              image, arch) in
+          let tag = Fmt.strf "%s-ocaml" tag in
+          Gen.multiarch_manifest ~target ~platforms |> fun m ->
+          tag, m in
+        let each_ocaml = List.map (fun ov ->
           let target = Fmt.strf "%s:%s-ocaml-%s" hub_id tag ov in
           let platforms =
             D.distro_arches distro |>
@@ -310,12 +320,12 @@ module Phases = struct
             List.map (fun arch ->
               let arch = arch_to_docker arch in
               let image = Fmt.strf "%s:%s-ocaml-%s-linux-%s" hub_id tag ov arch in
-              image, arch)
-          in
+              image, arch) in
           let tag = Fmt.strf "%s-ocaml-%s" tag ov in
           Gen.multiarch_manifest ~target ~platforms |> fun m ->
-          tag,m
-        ) D.stable_ocaml_versions
+          tag,m 
+        ) D.stable_ocaml_versions in
+        mega_ocaml :: each_ocaml
       ) D.active_distros |> List.flatten in
     C.iter (fun (t,m) -> Bos.OS.File.write (yaml_file t) m) yamls >>= fun () ->
     let cmd = C.Docker.manifest_push_file (yaml_file "{}") in
