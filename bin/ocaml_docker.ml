@@ -363,10 +363,13 @@ module Phases = struct
     G.generate_dockerfiles ~crunch:true build_dir dfiles >>= fun () ->
     if_opt build @@ fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
-    let tag = Fmt.strf "%s:{}-linux-%s" staging_hub_id tag_frag in
+    let tag = Fmt.strf "%s:base-linux-%s" staging_hub_id tag_frag in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst dfiles in
-    C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "01-build" cmd args >>= fun () ->
+    C.Mdlog.run_parallel ~retries:1 md "01-build" cmd args >>= fun () ->
+    let opam_cmd = Bos.Cmd.of_list ["opam";"list";"--installable";"-s"] in 
+    let pkgs_list = Fpath.(build_dir / "pkgs.txt") in
+    Bos.OS.Cmd.(run_out (C.Docker.run_cmd tag opam_cmd) |> to_file pkgs_list) >>= fun () ->
     Ok ()
 end
 

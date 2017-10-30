@@ -70,6 +70,9 @@ module Docker = struct
 
   let manifest_push_file file =
      Cmd.(v "manifest-tool" % "push" % "from-spec" % p file)
+
+  let run_cmd img cmd =
+    Cmd.(bin % "run" % img %% cmd)
 end
 
 (** Gnu Parallel *)
