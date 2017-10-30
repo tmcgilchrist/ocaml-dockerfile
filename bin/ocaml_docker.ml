@@ -134,6 +134,14 @@ module Gen = struct
       (Fmt.strf "%s-ocaml-%s" distro (D.tag_of_ocaml_version ov)), d
     )
 
+  let bulk_build distro arch prod_hub_id distro ocaml_version variant opam_repo_tag =
+    header prod_hub_id (Fmt.strf "%s-ocaml-%s" (D.tag_of_distro distro) ocaml_version) @@
+    (* TODO do opam_repo_tag once we have a v2 opam-repo branch so we can pull *)
+    (match variant with Some v -> run "opam switch %s+%s" ocaml_version v| None -> empty) @@
+    run "opam pin add depext https://github.com/AltGr/opam-depext.git#opam-2-beta4" @@
+    run "opam depext -uiy jbuilder ocamlfind"  |> fun dfile ->
+    ["base", dfile]
+
   let gen_opam_for_distro ?labels d =
     let fn =
      match D.resolve_alias d with
@@ -342,15 +350,24 @@ module Phases = struct
     C.Mdlog.run_parallel ~delay:1.0 ~retries:1 md "01-manifest" cmd args
 
   (* Setup a bulk build image *)
-  let phase5 {arch;staging_hub_id;prod_hub_id;build;push;build_dir;logs_dir} () =
+  let phase5 {arch;cache;staging_hub_id;prod_hub_id;build;push;build_dir;logs_dir} () =
     let arch_s = arch_to_docker arch in 
     let distro = `Alpine `V3_6 in (* TODO turn into cmdline switches *)
     let ov = "4.05.0" in
     let opam_repo_tag = "master" in
-    let prefix = Fmt.strf "phase5-%s-%s-%s-%s" (D.tag_of_distro distro) ov opam_repo_tag arch_s in
+    let tag_frag = Fmt.strf "%s-%s-%s-%s" (D.tag_of_distro distro) ov opam_repo_tag arch_s in
+    let prefix = Fmt.strf "phase5-%s" tag_frag in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
- 
-   (* let d = Gen.bulk_build distro arch prod_hub_id distro opam_repo_tag in *) Ok ()
+    let dfiles = Gen.bulk_build distro arch prod_hub_id distro ov None opam_repo_tag in
+    G.generate_dockerfiles ~crunch:true build_dir dfiles >>= fun () ->
+    if_opt build @@ fun () ->
+    let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
+    let tag = Fmt.strf "%s:{}-linux-%s" staging_hub_id tag_frag in
+    let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
+    let args = List.map fst dfiles in
+    C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "01-build" cmd args >>= fun () ->
+    Ok ()
+
     
 end
 
