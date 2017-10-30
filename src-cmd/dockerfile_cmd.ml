@@ -203,6 +203,9 @@ module Mdlog = struct
     t.cmds <- {label; args} :: t.cmds;
     Ok ()
 
+  let run_cmd t label cmd =
+    run_log t.logs_dir label cmd
+
   let output t =
     let cmds = List.rev t.cmds in
     Logs.info (fun l -> l "%s" (Sexplib.Sexp.to_string_hum (sexp_of_cmds cmds)));

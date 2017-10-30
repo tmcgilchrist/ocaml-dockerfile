@@ -138,7 +138,7 @@ module Gen = struct
     header prod_hub_id (Fmt.strf "%s-ocaml-%s" (D.tag_of_distro distro) ocaml_version) @@
     (* TODO do opam_repo_tag once we have a v2 opam-repo branch so we can pull *)
     (match variant with Some v -> run "opam switch %s+%s" ocaml_version v| None -> empty) @@
-    env ["OPAMYES","1"; "OPAMVERBOSE","1"] @@
+    env ["OPAMYES","1"; "OPAMVERBOSE","1"; "OPAMJOBS","2"] @@
     run "opam pin add depext https://github.com/AltGr/opam-depext.git#opam-2-beta4" @@
     run "opam depext -uiy jbuilder ocamlfind"  |> fun dfile ->
     ["base", dfile]
@@ -216,7 +216,6 @@ type copts = {
 
 let copts staging_hub_id prod_hub_id push cache build arch build_dir logs_dir =
   { staging_hub_id; prod_hub_id; push; cache; build; arch; build_dir; logs_dir }
-
 
 module Phases = struct
 
@@ -371,6 +370,30 @@ module Phases = struct
     let pkgs_list = Fpath.(build_dir / "pkgs.txt") in
     Bos.OS.Cmd.(run_out (C.Docker.run_cmd tag opam_cmd) |> to_file pkgs_list) >>= fun () ->
     Ok ()
+
+  let phase5_setup copts () =
+    let open Bos in 
+    let cmd = Cmd.(v "docker" % "volume" % "rm" % "opam2-archive") in
+    OS.Cmd.(run cmd) >>= fun () ->
+    let cmd =
+      Cmd.(v "docker" % "run" % "--name=create-opam2-archive" % "--mount" %
+             "source=opam2-archive,destination=/home/opam/opam-repository/cache" %
+             "opam2-archive" % "true") in
+    OS.Cmd.(run cmd) >>= fun () ->
+    Ok ()
+  
+  let phase5_build {arch;cache;staging_hub_id;prod_hub_id;build;build_dir;logs_dir} pkg () =
+    let arch_s = arch_to_docker arch in 
+    let distro = `Alpine `V3_6 in (* TODO turn into cmdline switches *)
+    let ov = "4.05.0" in
+    let opam_repo_tag = "master" in
+    let tag_frag = Fmt.strf "%s-%s-%s-%s" (D.tag_of_distro distro) ov opam_repo_tag arch_s in
+    let prefix = Fmt.strf "phase5-%s" tag_frag in
+    let open Bos in 
+    setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
+    let img = Fmt.strf "%s:base-linux-%s" staging_hub_id tag_frag in
+    Cmd.(v "docker" % "run" % "-v" % "opam2-archive:/home/opam/opam-repository/.opam/download-cache" % img % "opam" % "depext" % "-i" % pkg) |>
+    C.Mdlog.run_cmd md pkg
 end
 
 open Cmdliner
@@ -443,10 +466,25 @@ let phase4_cmd =
   Term.info "phase4" ~doc ~exits
 
 let phase5_cmd =
-  let doc = "setup a bulk build base image and generate a package list for it" in
+  let doc = "create a bulk build base image and generate a package list for it" in
   let exits = Term.default_exits in
   Term.(term_result (const Phases.phase5 $ copts_t $ setup_logs)),
   Term.info "phase5" ~doc ~exits
+
+let phase5_setup =
+  let doc = "setup cluster hosts for a bulk build" in
+  let exits = Term.default_exits in
+  Term.(term_result (const Phases.phase5_setup $ copts_t $ setup_logs)),
+  Term.info "phase5-setup" ~doc ~exits
+
+let phase5_build =
+  let doc = "build one package in a bulk build" in
+  let exits = Term.default_exits in
+  let pkg =
+    let doc = "Package to build" in
+    Arg.(required & pos ~rev:true 0 (some string) None & info [] ~docv:"PACKAGE" ~doc) in
+  Term.(term_result (const Phases.phase5_build $ copts_t $ pkg $ setup_logs)),
+  Term.info "phase5-build" ~doc ~exits
 
 let default_cmd =
   let doc = "build and push opam and OCaml multiarch container images" in
@@ -454,6 +492,6 @@ let default_cmd =
   Term.(ret (const (fun _ -> `Help (`Pager, None)) $ pure ())),
   Term.info "obi-docker" ~version:"v1.0.0" ~doc ~sdocs
 
-let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_ocaml_cmd; phase4_cmd; phase5_cmd]
+let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_ocaml_cmd; phase4_cmd; phase5_cmd; phase5_build; phase5_setup]
 let () = Term.(exit @@ eval_choice default_cmd cmds)
 
