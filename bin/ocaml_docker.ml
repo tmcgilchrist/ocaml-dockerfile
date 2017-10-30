@@ -373,7 +373,7 @@ module Phases = struct
 
   let phase5_setup copts () =
     let open Bos in 
-    let cmd = Cmd.(v "docker" % "volume" % "rm" % "opam2-archive") in
+    let cmd = Cmd.(v "docker" % "volume" % "rm" % "-f" % "opam2-archive") in
     OS.Cmd.(run cmd) >>= fun () ->
     let cmd =
       Cmd.(v "docker" % "run" % "--name=create-opam2-archive" % "--mount" %
