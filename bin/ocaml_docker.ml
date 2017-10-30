@@ -43,7 +43,7 @@ module Gen = struct
     copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.Apk.install "build-base tar ca-certificates git rsync curl sudo bash" @@ 
-    L.Apk.add_user ~uid:1000 ~gid:1000 ~sudo:true "opam" @@
+    L.Apk.add_user ~uid:1000 ~sudo:true "opam" @@
     L.Git.init () @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
@@ -57,7 +57,7 @@ module Gen = struct
     copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.Apt.install "build-essential curl git rsync sudo unzip" @@
-    L.Apt.add_user ~uid:1000 ~gid:1000 ~sudo:true "opam" @@
+    L.Apt.add_user ~uid:1000 ~sudo:true "opam" @@
     L.Git.init () @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
@@ -73,7 +73,7 @@ module Gen = struct
     L.RPM.dev_packages ~extra:"which tar curl xz" () @@
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
-    L.RPM.add_user ~uid:1000 ~gid:1000 ~sudo:true "opam" @@ (** TODO pin uid at 1000 *)
+    L.RPM.add_user ~uid:1000 ~sudo:true "opam" @@ (** TODO pin uid at 1000 *)
     L.Git.init () @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
@@ -87,7 +87,7 @@ module Gen = struct
     L.Zypper.dev_packages () @@
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
-    L.Zypper.add_user ~uid:1000 ~gid:1000 ~sudo:true "opam" @@
+    L.Zypper.add_user ~uid:1000 ~sudo:true "opam" @@
     L.Git.init () @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
@@ -432,12 +432,18 @@ let phase4_cmd =
   Term.(term_result (const Phases.phase4 $ copts_t $ setup_logs)),
   Term.info "phase4" ~doc ~exits
 
+let phase5_cmd =
+  let doc = "setup a bulk build base image and generate a package list for it" in
+  let exits = Term.default_exits in
+  Term.(term_result (const Phases.phase5 $ copts_t $ setup_logs)).
+  Term.info "phase5" ~doc ~exits
+
 let default_cmd =
   let doc = "build and push opam and OCaml multiarch container images" in
   let sdocs = Manpage.s_common_options in
   Term.(ret (const (fun _ -> `Help (`Pager, None)) $ pure ())),
   Term.info "obi-docker" ~version:"v1.0.0" ~doc ~sdocs
 
-let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_megaocaml_cmd; phase3_ocaml_cmd; phase4_cmd]
+let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_megaocaml_cmd; phase3_ocaml_cmd; phase4_cmd; phase5_cmd]
 let () = Term.(exit @@ eval_choice default_cmd cmds)
 
