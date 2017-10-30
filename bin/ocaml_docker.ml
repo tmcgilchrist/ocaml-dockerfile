@@ -138,6 +138,7 @@ module Gen = struct
     header prod_hub_id (Fmt.strf "%s-ocaml-%s" (D.tag_of_distro distro) ocaml_version) @@
     (* TODO do opam_repo_tag once we have a v2 opam-repo branch so we can pull *)
     (match variant with Some v -> run "opam switch %s+%s" ocaml_version v| None -> empty) @@
+    env ["OPAMYES","1"; "OPAMVERBOSE","1"] @@
     run "opam pin add depext https://github.com/AltGr/opam-depext.git#opam-2-beta4" @@
     run "opam depext -uiy jbuilder ocamlfind"  |> fun dfile ->
     ["base", dfile]
@@ -367,8 +368,6 @@ module Phases = struct
     let args = List.map fst dfiles in
     C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "01-build" cmd args >>= fun () ->
     Ok ()
-
-    
 end
 
 open Cmdliner
