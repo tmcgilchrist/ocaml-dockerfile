@@ -42,8 +42,8 @@ module Gen = struct
     from ~tag distro @@
     copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
-    L.Apk.install "build-base tar ca-certificates git rsync curl sudo" @@ 
-    L.Apk.add_user ~sudo:true "opam" @@
+    L.Apk.install "build-base tar ca-certificates git rsync curl sudo bash" @@ 
+    L.Apk.add_user ~uid:1000 ~gid:1000 ~sudo:true "opam" @@
     L.Git.init () @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
@@ -57,6 +57,7 @@ module Gen = struct
     copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.Apt.install "build-essential curl git rsync sudo unzip" @@
+    L.Apt.add_user ~uid:1000 ~gid:1000 ~sudo:true "opam" @@
     L.Git.init () @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
@@ -72,7 +73,7 @@ module Gen = struct
     L.RPM.dev_packages ~extra:"which tar curl xz" () @@
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
-    L.RPM.add_user ~sudo:true "opam" @@ (** TODO pin uid at 1000 *)
+    L.RPM.add_user ~uid:1000 ~gid:1000 ~sudo:true "opam" @@ (** TODO pin uid at 1000 *)
     L.Git.init () @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
@@ -86,7 +87,7 @@ module Gen = struct
     L.Zypper.dev_packages () @@
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
-    L.Zypper.add_user ~sudo:true "opam" @@
+    L.Zypper.add_user ~uid:1000 ~gid:1000 ~sudo:true "opam" @@
     L.Git.init () @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 

@@ -35,7 +35,9 @@ module RPM = struct
   let install fmt = ksprintf (run "rpm --rebuilddb && yum install -y %s && yum clean all") fmt
   let groupinstall fmt = ksprintf (run "rpm --rebuilddb && yum groupinstall -y %s && yum clean all") fmt
 
-  let add_user ?(sudo=false) username =
+  let add_user ?uid ?gid ?(sudo=false) username =
+    let uid = match uid with Some u -> sprintf "-u %d " u | None -> "" in
+    let gid = match gid with Some g -> sprintf "-g %d " g | None -> "" in
     let home = "/home/"^username in
     (match sudo with
     | false -> empty
@@ -45,7 +47,7 @@ module RPM = struct
         run "chmod 440 %s" sudofile @@
         run "chown root:root %s" sudofile @@
         run "sed -i.bak 's/^Defaults.*requiretty//g' /etc/sudoers") @@
-    run "useradd -d %s -m -s /bin/bash %s" home username @@
+    run "useradd -d %s %s%s-m -s /bin/bash %s" home uid gid username @@
     run "passwd -l %s" username @@
     run "chown -R %s:%s %s" username username home @@
     user "%s" username @@
@@ -73,7 +75,9 @@ module Apt = struct
     install "sudo pkg-config git build-essential m4 software-properties-common aspcud unzip rsync curl dialog nano libx11-dev%s"
       (match extra with None -> "" | Some x -> " " ^ x)
 
-  let add_user ?(sudo=false) username =
+  let add_user ?uid ?gid ?(sudo=false) username =
+    let uid = match uid with Some u -> sprintf "--uid %d " u | None -> "" in
+    let gid = match gid with Some g -> sprintf "--gid %d " g | None -> "" in
     let home = "/home/"^username in
     (match sudo with
     | false -> empty
@@ -82,7 +86,7 @@ module Apt = struct
         run "echo '%s %s' > %s" username sudo_nopasswd sudofile @@
         run "chmod 440 %s" sudofile @@
         run "chown root:root %s" sudofile) @@
-    run "adduser --disabled-password --gecos '' %s" username @@
+    run "adduser %s%s--disabled-password --gecos '' %s" uid gid username @@
     run "passwd -l %s" username @@
     run "chown -R %s:%s %s" username username home @@
     user "%s" username @@
