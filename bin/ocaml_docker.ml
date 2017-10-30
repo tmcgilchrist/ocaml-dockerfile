@@ -122,7 +122,7 @@ module Gen = struct
     List.filter (D.ocaml_supported_on arch) |>
     List.map (fun ov ->
       let default_switch = D.ocaml_version_to_opam_switch ov in
-      let variants = List.map (run "opam switch create %s") Ocaml_version.(of_string ov |> Has.variants) |> (@@@) empty in
+      let variants = List.map (run "opam switch create %s+%s" default_switch) Ocaml_version.(of_string ov |> Has.variants) |> (@@@) empty in
       let d = 
         header hub_id (Fmt.strf "%s-opam" distro) @@
         run "cd /home/opam/opam-repository && git pull origin master" @@
