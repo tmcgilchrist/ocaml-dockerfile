@@ -375,11 +375,11 @@ module Phases = struct
     let open Bos in 
     let cmd = Cmd.(v "docker" % "volume" % "rm" % "-f" % "opam2-archive") in
     OS.Cmd.(run cmd) >>= fun () ->
-    let cmd =
-      Cmd.(v "docker" % "run" % "--name=create-opam2-archive" % "--mount" %
-             "source=opam2-archive,destination=/home/opam/opam-repository/cache" %
-             "opam2-archive" % "true") in
+    let cmd = Cmd.(v "docker" % "run" % "--name=create-opam2-archive" % "--mount" %
+      "source=opam2-archive,destination=/home/opam/opam-repository/cache" %
+      "opam2-archive" % "true") in
     OS.Cmd.(run cmd) >>= fun () ->
+    OS.Cmd.(run Cmd.(v "docker" % "rm" % "create-opam2-archive")) >>= fun () ->
     Ok ()
   
   let phase5_build {arch;cache;staging_hub_id;prod_hub_id;build;build_dir;logs_dir} pkg () =
@@ -392,7 +392,7 @@ module Phases = struct
     let open Bos in 
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
     let img = Fmt.strf "%s:base-linux-%s" staging_hub_id tag_frag in
-    Cmd.(v "docker" % "run" % "-v" % "opam2-archive:/home/opam/opam-repository/.opam/download-cache" % img % "opam" % "depext" % "-i" % pkg) |>
+    Cmd.(v "docker" % "run" % "-v" % "opam2-archive:/home/opam/.opam/download-cache" % img % "opam" % "depext" % "-i" % pkg) |>
     C.Mdlog.run_cmd md pkg
 end
 
