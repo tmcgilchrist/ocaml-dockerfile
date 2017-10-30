@@ -272,7 +272,7 @@ module Phases = struct
     if_opt build @@ fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:"{}" (Fpath.v ".") in
-    let args = ["opam2-archive"] in
+    let args = [Fmt.strf "%s:%s" staging_hub_id "opam2-archive"] in
     C.Mdlog.run_parallel ~retries:1 md "01-build" cmd args >>= fun () ->
     if_opt push @@ fun () ->
     let cmd = C.Docker.push_cmd "{}" in
