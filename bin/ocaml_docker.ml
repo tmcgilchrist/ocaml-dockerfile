@@ -355,6 +355,10 @@ module Phases = struct
     let cmd = C.Docker.manifest_push_file (yaml_file "{}") in
     let args = List.map (fun (t,_) -> t) yamls in
     C.Mdlog.run_parallel ~delay:1.0 ~retries:1 md "01-manifest" cmd args
+
+  (* Setup a bulk build image *)
+  let phase5 {prod_hub_id;build;push} () =
+    Ok ()
 end
 
 open Cmdliner
@@ -435,7 +439,7 @@ let phase4_cmd =
 let phase5_cmd =
   let doc = "setup a bulk build base image and generate a package list for it" in
   let exits = Term.default_exits in
-  Term.(term_result (const Phases.phase5 $ copts_t $ setup_logs)).
+  Term.(term_result (const Phases.phase5 $ copts_t $ setup_logs)),
   Term.info "phase5" ~doc ~exits
 
 let default_cmd =
