@@ -330,7 +330,7 @@ module Phases = struct
     C.iter (fun (t,m) -> Bos.OS.File.write (yaml_file t) m) yamls >>= fun () ->
     let cmd = C.Docker.manifest_push_file (yaml_file "{}") in
     let args = List.map (fun (t,_) -> t) yamls in
-    C.Mdlog.run_parallel ~retries:1 md "01-manifest" cmd args
+    C.Mdlog.run_parallel ~delay:1.0 ~retries:1 md "01-manifest" cmd args
 end
 
 open Cmdliner
