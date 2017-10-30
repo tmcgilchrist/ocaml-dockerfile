@@ -64,7 +64,7 @@ module Has = struct
   let variants {major;minor;_} =
     match major,minor with
     |4,7 -> ["afl";"flambda";"unsafe-string"]
-    |4,6 -> ["afl";"flambda";"safe-string"]
+    |4,6 -> ["afl";"flambda"] (* ;"safe-string"] TODO fix in opam *)
     |4,5 -> ["afl";"flambda"]
     |4,4 -> ["flambda"]
     |4,3 -> ["flambda"]
