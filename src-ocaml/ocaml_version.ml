@@ -60,4 +60,13 @@ module Has = struct
     match compare (Since.arch a) v with
     |(-1) | 0 -> true
     |n -> false
+
+  let variants {major;minor;_} =
+    match major,minor with
+    |4,7 -> ["afl";"flambda";"unsafe-string"]
+    |4,6 -> ["afl";"flambda";"safe-string"]
+    |4,5 -> ["afl";"flambda";"32-bit";"spacetime"]
+    |4,4 -> ["flambda"]
+    |4,3 -> ["flambda"]
+    |_ -> []
 end

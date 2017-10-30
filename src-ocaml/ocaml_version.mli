@@ -13,4 +13,5 @@ end
 module Has : sig
   val bytes : t -> bool
   val arch : arch -> t -> bool
+  val variants : t -> string list
 end
