@@ -279,39 +279,24 @@ module Phases = struct
     let cmd = C.Docker.push_cmd "{}" in
     C.Mdlog.run_parallel ~retries:1 md "02-push" cmd args
 
-  (* Generate a single container with all the ocaml compilers present *)
-  let phase3_megaocaml {cache;push;build;arch;prod_hub_id;staging_hub_id;build_dir;logs_dir} () =
-    let arch_s = arch_to_docker arch in
-    let prefix = Fmt.strf "phase3-megaocaml-%s" arch_s in
-    setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
-    let d =
-      List.filter (D.distro_supported_on arch) D.active_distros |>
-      List.map (Gen.all_ocaml_compilers prod_hub_id arch) in
-    G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
-    if_opt build @@ fun () ->
-    let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
-    let tag = Fmt.strf "%s:{}-linux-%s" staging_hub_id arch_s in
-    let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
-    let args = List.map fst d in
-    C.Mdlog.run_parallel ~retries:1 md "01-build" cmd args >>= fun () ->
-    if_opt push @@ fun () ->
-    let cmd = C.Docker.push_cmd tag in
-    C.Mdlog.run_parallel ~retries:1 md "02-push" cmd args
-
   let phase3_ocaml {cache;push;build;arch;staging_hub_id;prod_hub_id;build_dir;logs_dir} () =
     let arch_s = arch_to_docker arch in
     let prefix = Fmt.strf "phase3-ocaml-%s" arch_s in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
-    let d =
+    let all_compilers =
+      List.filter (D.distro_supported_on arch) D.active_distros |>
+      List.map (Gen.all_ocaml_compilers prod_hub_id arch) in
+    let each_compiler =
       List.filter (D.distro_supported_on arch) D.active_distros |>
       List.map (Gen.separate_ocaml_compilers prod_hub_id arch) |>
       List.flatten in
-    G.generate_dockerfiles ~crunch:true build_dir d >>= fun () ->
+    let dfiles = all_compilers @ each_compiler in
+    G.generate_dockerfiles ~crunch:true build_dir dfiles >>= fun () ->
     if_opt build @@ fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let tag = Fmt.strf "%s:{}-linux-%s" staging_hub_id arch_s in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
-    let args = List.map fst d in
+    let args = List.map fst dfiles in
     C.Mdlog.run_parallel ~delay:5.0 ~retries:1 md "01-build" cmd args >>= fun () ->
     if_opt push @@ fun () ->
     let cmd = C.Docker.push_cmd tag in
@@ -357,8 +342,16 @@ module Phases = struct
     C.Mdlog.run_parallel ~delay:1.0 ~retries:1 md "01-manifest" cmd args
 
   (* Setup a bulk build image *)
-  let phase5 {prod_hub_id;build;push} () =
-    Ok ()
+  let phase5 {arch;staging_hub_id;prod_hub_id;build;push;build_dir;logs_dir} () =
+    let arch_s = arch_to_docker arch in 
+    let distro = `Alpine `V3_6 in (* TODO turn into cmdline switches *)
+    let ov = "4.05.0" in
+    let opam_repo_tag = "master" in
+    let prefix = Fmt.strf "phase5-%s-%s-%s-%s" (D.tag_of_distro distro) ov opam_repo_tag arch_s in
+    setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
+ 
+   (* let d = Gen.bulk_build distro arch prod_hub_id distro opam_repo_tag in *) Ok ()
+    
 end
 
 open Cmdliner
@@ -418,12 +411,6 @@ let phase3_archive_cmd =
   Term.(term_result (const Phases.phase3_archive $ copts_t $ setup_logs)),
   Term.info "phase3-cache" ~doc ~exits
 
-let phase3_megaocaml_cmd =
-  let doc = "generate a ocaml compiler container with all the things" in
-  let exits = Term.default_exits in
-  Term.(term_result (const Phases.phase3_megaocaml $ copts_t $ setup_logs)),
-  Term.info "phase3-megaocaml" ~doc ~exits
-
 let phase3_ocaml_cmd =
   let doc = "generate a matrix of ocaml compilers" in
   let exits = Term.default_exits in
@@ -448,6 +435,6 @@ let default_cmd =
   Term.(ret (const (fun _ -> `Help (`Pager, None)) $ pure ())),
   Term.info "obi-docker" ~version:"v1.0.0" ~doc ~sdocs
 
-let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_megaocaml_cmd; phase3_ocaml_cmd; phase4_cmd; phase5_cmd]
+let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_ocaml_cmd; phase4_cmd; phase5_cmd]
 let () = Term.(exit @@ eval_choice default_cmd cmds)
 
