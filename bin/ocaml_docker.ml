@@ -398,12 +398,13 @@ module Phases = struct
 
   let phase5_cluster copts hosts () =
     let open Bos in
+    let hosts_l = String.concat "," hosts in
     Cmd.(v "cp" % "./_build/default/bin/ocaml_docker.exe" % "./ocaml-docker") |>
     OS.Cmd.run >>= fun () ->
     C.iter (fun host ->
       Cmd.(v "rsync" % "-a" % "./_build/default/bin/ocaml_docker.exe" % (host^":ocaml-docker")) |>
       OS.Cmd.run >>= fun () ->
-      Cmd.(v "./ocaml-docker" % "phase5-setup" % "-vvv") |>
+      Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "--nonall" % "./ocaml-docker" % "phase5-setup" % "-vvv") |>
       OS.Cmd.run
     ) hosts >>= fun () ->
     Ok ()
