@@ -403,7 +403,9 @@ module Phases = struct
 
   let phase5_cluster {arch;build_dir;logs_dir} {distro;ov;variant} hosts () =
     let arch_s = arch_to_docker arch in 
+    (* TODO pass through arch in prefix and cmdline *)
     let ov = Ocaml_version.to_string ov in
+    let opts = ["--ocaml-version"; ov ] @ (match variant with None -> [] |Some v -> ["--ocaml-variant"; v]) in
     let opam_repo_tag = "master" in
     let tag_frag = Fmt.strf "%s-%s%s-%s-%s" (D.tag_of_distro distro) ov (match variant with None -> "" |Some v -> "-"^v) opam_repo_tag arch_s in
     let prefix = Fmt.strf "phase5-%s" tag_frag in
@@ -412,7 +414,7 @@ module Phases = struct
     let hosts_l = String.concat "," hosts in
     Bos.OS.File.read_lines Fpath.(build_dir / "pkgs.txt") >>= fun pkgs ->
     let joblog_f = Fpath.(logs_dir / "bulk-joblog.txt") in
-    Cmd.(v "parallel" % "--controlmaster" % "--timeout" % "300" % "--progress" % "--joblog" % p joblog_f % "--no-notice" % "-S" % hosts_l % "./ocaml-docker" % "phase5-build" % "{}" % "-vvv" % ":::" %% of_list pkgs) |> OS.Cmd.run >>= fun () ->
+    Cmd.(v "parallel" % "--controlmaster" % "--timeout" % "300" % "--progress" % "--joblog" % p joblog_f % "--no-notice" % "-S" % hosts_l % "./ocaml-docker" % "phase5-build" %% of_list opts % "{}" % "-vvv" % ":::" %% of_list pkgs) |> OS.Cmd.run >>= fun () ->
     Cmd.(v "parallel" % "--no-notice" % "rsync" % "-av" % "{}:_logs" % "." % ":::" %% of_list hosts) |> OS.Cmd.run >>= fun () ->
     Ok ()
 end
