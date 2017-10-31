@@ -396,16 +396,17 @@ module Phases = struct
     Cmd.(v "docker" % "run" % "-v" % "opam2-archive:/home/opam/.opam/download-cache" % img % "opam" % "depext" % "-i" % pkg) |>
     C.Mdlog.run_cmd md pkg
 
-  let phase5_cluster copts hosts () =
+  let phase5_cluster {build_dir;logs_dir} hosts () =
     let open Bos in
     let hosts_l = String.concat "," hosts in
+    setup_log_dirs ~prefix:"cluster" build_dir logs_dir @@ fun build_dir md ->
     Cmd.(v "cp" % "./_build/default/bin/ocaml_docker.exe" % "./ocaml-docker") |>
     OS.Cmd.run >>= fun () ->
     C.iter (fun host ->
       Cmd.(v "rsync" % "-a" % "./_build/default/bin/ocaml_docker.exe" % (host^":ocaml-docker")) |>
       OS.Cmd.run >>= fun () ->
-      Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "--nonall" % "./ocaml-docker" % "phase5-setup" % "-vvv") |>
-      OS.Cmd.run
+      Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "--nonall" % "./ocaml-docker" % "phase5-setup" % "-vvv") |> OS.Cmd.run
+      Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "--nonall" % "./ocaml-docker" % "phase5-build" % "mirage" % "-vvv") |> OS.Cmd.run
     ) hosts >>= fun () ->
     Ok ()
 end
