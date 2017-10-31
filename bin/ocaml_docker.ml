@@ -402,7 +402,7 @@ module Phases = struct
     C.iter (fun host ->
       Cmd.(v "rsync" % "-a" % "./_build/default/bin/ocaml_docker.exe" % (host^":ocaml-docker")) |>
       OS.Cmd.run >>= fun () ->
-      Cmd.(v "./ocaml-docker phase5-setup") |>
+      Cmd.(v "./ocaml-docker" % "phase5-setup" % "-vvv") |>
       OS.Cmd.run
     ) hosts >>= fun () ->
     Ok ()
