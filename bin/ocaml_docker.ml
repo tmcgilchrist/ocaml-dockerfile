@@ -396,17 +396,24 @@ module Phases = struct
     Cmd.(v "docker" % "run" % "--rm" % "-v" % "opam2-archive:/home/opam/.opam/download-cache" % img % "opam" % "depext" % "-i" % pkg) |>
     C.Mdlog.run_cmd md pkg
 
-  let phase5_cluster {build_dir;logs_dir} hosts () =
-    let open Bos in
+  let phase5_cluster {arch;build_dir;logs_dir} hosts () =
+    let arch_s = arch_to_docker arch in 
+    let distro = `Alpine `V3_6 in (* TODO turn into cmdline switches *)
+    let ov = "4.05.0" in
+    let opam_repo_tag = "master" in
+    let tag_frag = Fmt.strf "%s-%s-%s-%s" (D.tag_of_distro distro) ov opam_repo_tag arch_s in
+    let prefix = Fmt.strf "phase5-%s" tag_frag in
+    let open Bos in 
+    setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
     let hosts_l = String.concat "," (List.map (fun s -> "30/"^s) hosts) in
-    setup_log_dirs ~prefix:"cluster" build_dir logs_dir @@ fun build_dir md ->
-    Cmd.(v "cp" % "./_build/default/bin/ocaml_docker.exe" % "./ocaml-docker") |>
+    Cmd.(v "cp" % "./_buildmirage/default/bin/ocaml_docker.exe" % "./ocaml-docker") |>
     OS.Cmd.run >>= fun () ->
+    Bos.OS.File.read_lines Fpath.(logs_dir / "pkgs.txt") >>= fun pkgs ->
     C.iter (fun host ->
       Cmd.(v "rsync" % "-a" % "./_build/default/bin/ocaml_docker.exe" % (host^":ocaml-docker")) |>
       OS.Cmd.run >>= fun () ->
       Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "--nonall" % "./ocaml-docker" % "phase5-setup" % "-vvv") |> OS.Cmd.run >>=	fun () ->
-      Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "--nonall" % "./ocaml-docker" % "phase5-build" % "mirage" % "-vvv") |> OS.Cmd.run
+      Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "echo" % "./ocaml-docker" % "phase5-build" % "{}" % "-vvv" % ":::" %% of_list pkgs) |> OS.Cmd.run
     ) hosts >>= fun () ->
     Ok ()
 end
