@@ -394,6 +394,18 @@ module Phases = struct
     let img = Fmt.strf "%s:base-linux-%s" staging_hub_id tag_frag in
     Cmd.(v "docker" % "run" % "-v" % "opam2-archive:/home/opam/.opam/download-cache" % img % "opam" % "depext" % "-i" % pkg) |>
     C.Mdlog.run_cmd md pkg
+
+  let phase5_cluster copts hosts () =
+    let open Bos in
+    Cmd.v "cp ./_build/default/bin/ocaml_docker.exe ./ocaml-docker" |>
+    OS.Cmd.run >>= fun () ->
+    C.iter (fun host ->
+      Cmd.(v "rsync" % "-a" % "./_build/default/bin/ocaml_docker.exe" % (host^":ocaml-docker")) |>
+      OS.Cmd.run >>= fun () ->
+      Cmd.(v "./ocaml-docker phase5-setup") |>
+      OS.Cmd.run
+    ) hosts >>= fun () ->
+    Ok ()
 end
 
 open Cmdliner
@@ -470,6 +482,10 @@ let phase5_cmd =
   let exits = Term.default_exits in
   Term.(term_result (const Phases.phase5 $ copts_t $ setup_logs)),
   Term.info "phase5" ~doc ~exits
+
+let ssh_hosts =
+  let doc = "cluster hosts to ssh to" in
+  Arg.(value & opt (list string) [] & info ["hosts"] ~docv:"PUSH" ~doc)
 
 let phase5_setup =
   let doc = "setup cluster hosts for a bulk build" in
