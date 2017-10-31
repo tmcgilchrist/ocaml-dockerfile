@@ -406,7 +406,7 @@ module Phases = struct
     let open Bos in 
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
     let hosts_l = String.concat "," (List.map (fun s -> "30/"^s) hosts) in
-    Bos.OS.File.read_lines Fpath.(logs_dir / prefix / "pkgs.txt") >>= fun pkgs ->
+    Bos.OS.File.read_lines Fpath.(build_dir / "pkgs.txt") >>= fun pkgs ->
     C.iter (fun host ->
       Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "--nonall" % "./ocaml-docker" % "phase5-setup" % "-vvv") |> OS.Cmd.run >>=	fun () ->
       Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "echo" % "./ocaml-docker" % "phase5-build" % "{}" % "-vvv" % ":::" %% of_list pkgs) |> OS.Cmd.run
