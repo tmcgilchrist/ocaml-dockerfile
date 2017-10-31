@@ -405,7 +405,7 @@ module Phases = struct
     let prefix = Fmt.strf "phase5-%s" tag_frag in
     let open Bos in 
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
-    let hosts_l = String.concat "," (List.map (fun s -> "30/"^s) hosts) in
+    let hosts_l = String.concat "," (List.map (fun s -> "10/"^s) hosts) in
     Bos.OS.File.read_lines Fpath.(build_dir / "pkgs.txt") >>= fun pkgs ->
     C.iter (fun host ->
       Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "--nonall" % "./ocaml-docker" % "phase5-setup" % "-vvv") |> OS.Cmd.run >>=	fun () ->
