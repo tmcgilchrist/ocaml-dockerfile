@@ -217,6 +217,13 @@ type copts = {
 let copts staging_hub_id prod_hub_id push cache build arch build_dir logs_dir =
   { staging_hub_id; prod_hub_id; push; cache; build; arch; build_dir; logs_dir }
 
+type build_t = {
+  ov: Ocaml_version.t;
+  variant: string option;
+  distro: D.t
+}
+
+
 module Phases = struct
 
   open Rresult
@@ -350,15 +357,14 @@ module Phases = struct
     C.Mdlog.run_parallel ~delay:1.0 ~retries:1 md "01-manifest" cmd args
 
   (* Setup a bulk build image *)
-  let phase5 {arch;cache;staging_hub_id;prod_hub_id;build;push;build_dir;logs_dir} () =
+  let phase5 {arch;cache;staging_hub_id;prod_hub_id;build;push;build_dir;logs_dir} {distro;ov;variant} () =
     let arch_s = arch_to_docker arch in 
-    let distro = `Alpine `V3_6 in (* TODO turn into cmdline switches *)
-    let ov = "4.05.0" in
+    let ov = Ocaml_version.to_string ov in
     let opam_repo_tag = "master" in
-    let tag_frag = Fmt.strf "%s-%s-%s-%s" (D.tag_of_distro distro) ov opam_repo_tag arch_s in
+    let tag_frag = Fmt.strf "%s-%s%s-%s-%s" (D.tag_of_distro distro) ov (match variant with None -> "" |Some v -> "-"^v) opam_repo_tag arch_s in
     let prefix = Fmt.strf "phase5-%s" tag_frag in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
-    let dfiles = Gen.bulk_build distro arch prod_hub_id distro ov None opam_repo_tag in
+    let dfiles = Gen.bulk_build distro arch prod_hub_id distro ov variant opam_repo_tag in
     G.generate_dockerfiles ~crunch:true build_dir dfiles >>= fun () ->
     if_opt build @@ fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
@@ -383,12 +389,11 @@ module Phases = struct
       Fmt.strf "%s:opam2-archive" staging_hub_id % "true") in
     OS.Cmd.(run cmd)
   
-  let phase5_build {arch;cache;staging_hub_id;prod_hub_id;build;build_dir;logs_dir} pkg () =
+  let phase5_build {arch;cache;staging_hub_id;prod_hub_id;build;build_dir;logs_dir} {distro;ov;variant} pkg () =
     let arch_s = arch_to_docker arch in 
-    let distro = `Alpine `V3_6 in (* TODO turn into cmdline switches *)
-    let ov = "4.05.0" in
-    let opam_repo_tag = "master" in
-    let tag_frag = Fmt.strf "%s-%s-%s-%s" (D.tag_of_distro distro) ov opam_repo_tag arch_s in
+    let ov = Ocaml_version.to_string ov in
+    let opam_repo_tag = "master" in (* TODO add variant to tag frag *)
+    let tag_frag = Fmt.strf "%s-%s%s-%s-%s" (D.tag_of_distro distro) ov (match variant with None -> "" |Some v -> "-"^v) opam_repo_tag arch_s in
     let prefix = Fmt.strf "phase5-%s" tag_frag in
     let open Bos in 
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
@@ -396,22 +401,19 @@ module Phases = struct
     Cmd.(v "docker" % "run" % "--rm" % "-v" % "opam2-archive:/home/opam/.opam/download-cache" % img % "opam" % "depext" % "-i" % pkg) |>
     C.Mdlog.run_cmd md pkg
 
-  let phase5_cluster {arch;build_dir;logs_dir} hosts () =
+  let phase5_cluster {arch;build_dir;logs_dir} {distro;ov;variant} hosts () =
     let arch_s = arch_to_docker arch in 
-    let distro = `Alpine `V3_6 in (* TODO turn into cmdline switches *)
-    let ov = "4.05.0" in
+    let ov = Ocaml_version.to_string ov in
     let opam_repo_tag = "master" in
-    let tag_frag = Fmt.strf "%s-%s-%s-%s" (D.tag_of_distro distro) ov opam_repo_tag arch_s in
+    let tag_frag = Fmt.strf "%s-%s%s-%s-%s" (D.tag_of_distro distro) ov (match variant with None -> "" |Some v -> "-"^v) opam_repo_tag arch_s in
     let prefix = Fmt.strf "phase5-%s" tag_frag in
     let open Bos in 
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
-    let hosts_l = String.concat "," (List.map (fun s -> "8/"^s) hosts) in
+    let hosts_l = String.concat "," hosts in
     Bos.OS.File.read_lines Fpath.(build_dir / "pkgs.txt") >>= fun pkgs ->
-    C.iter (fun host ->
-(* 
-      Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "--nonall" % "./ocaml-docker" % "phase5-setup" % "-vvv") |> OS.Cmd.run >>=	fun () -> *)
-      Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "./ocaml-docker" % "phase5-build" % "{}" % "-vvv" % ":::" %% of_list pkgs) |> OS.Cmd.run
-    ) hosts >>= fun () ->
+    let joblog_f = Fpath.(logs_dir / "bulk-joblog.txt") in
+    Cmd.(v "parallel" % "--progress" % "--joblog" % p joblog_f % "--no-notice" % "-S" % hosts_l % "./ocaml-docker" % "phase5-build" % "{}" % "-vvv" % ":::" %% of_list pkgs) |> OS.Cmd.run >>= fun () ->
+    Cmd.(v "parallel" % "--no-notice" % "rsync" % "-av" % "{}:_logs" % "." % ":::" %% of_list hosts) |> OS.Cmd.run >>= fun () ->
     Ok ()
 end
 
@@ -484,15 +486,35 @@ let phase4_cmd =
   Term.(term_result (const Phases.phase4 $ copts_t $ setup_logs)),
   Term.info "phase4" ~doc ~exits
 
-let phase5_cmd =
-  let doc = "create a bulk build base image and generate a package list for it" in
-  let exits = Term.default_exits in
-  Term.(term_result (const Phases.phase5 $ copts_t $ setup_logs)),
-  Term.info "phase5" ~doc ~exits
-
 let ssh_hosts =
   let doc = "cluster hosts to ssh to" in
   Arg.(value & opt (list string) [] & info ["hosts"] ~docv:"PUSH" ~doc)
+
+let buildv ov variant distro =
+  Ocaml_version.of_string ov |> fun ov ->
+  let distro = 
+    match D.distro_of_tag distro with
+    |None -> failwith "unknown distro"
+    |Some distro -> distro in
+  { ov; variant; distro }
+
+let build_t =
+  let ocaml_version =
+    let doc = "ocaml version to build" in
+    Arg.(value & opt string "4.05.0" & info ["ocaml-version"] ~docv:"OCAML_VERSION" ~doc) in
+  let ocaml_variant =
+    let doc = "ocaml compiler variant to build" in
+    Arg.(value & opt (some string) None & info ["ocaml-variant"] ~docv:"OCAML_VARIANT" ~doc) in
+  let distro =
+    let doc = "distro to build" in
+    Arg.(value & opt string "alpine-3.6" & info ["distro"] ~docv:"DISTRO" ~doc) in
+  Term.(const buildv $ ocaml_version $ ocaml_variant $ distro)
+ 
+let phase5_cmd =
+  let doc = "create a bulk build base image and generate a package list for it" in
+  let exits = Term.default_exits in
+  Term.(term_result (const Phases.phase5 $ copts_t $ build_t $ setup_logs)),
+  Term.info "phase5" ~doc ~exits
 
 let phase5_setup =
   let doc = "setup cluster hosts for a bulk build" in
@@ -506,13 +528,13 @@ let phase5_build =
   let pkg =
     let doc = "Package to build" in
     Arg.(required & pos ~rev:true 0 (some string) None & info [] ~docv:"PACKAGE" ~doc) in
-  Term.(term_result (const Phases.phase5_build $ copts_t $ pkg $ setup_logs)),
+  Term.(term_result (const Phases.phase5_build $ copts_t $ build_t $ pkg $ setup_logs)),
   Term.info "phase5-build" ~doc ~exits
 
 let phase5_cluster =
   let doc = "run cluster build" in
   let exits = Term.default_exits in
-  Term.(term_result (const Phases.phase5_cluster $ copts_t $ ssh_hosts $ setup_logs)),
+  Term.(term_result (const Phases.phase5_cluster $ copts_t $ build_t $ ssh_hosts $ setup_logs)),
   Term.info "phase5-cluster" ~doc ~exits
 
 let default_cmd =
