@@ -414,7 +414,7 @@ module Phases = struct
     let hosts_l = String.concat "," hosts in
     Bos.OS.File.read_lines Fpath.(build_dir / "pkgs.txt") >>= fun pkgs ->
     let joblog_f = Fpath.(logs_dir / "bulk-joblog.txt") in
-    Cmd.(v "parallel" % "--controlmaster" % "--timeout" % "300" % "--progress" % "--joblog" % p joblog_f % "--no-notice" % "-S" % hosts_l % "./ocaml-docker" % "phase5-build" %% of_list opts % "{}" % "-vvv" % ":::" %% of_list pkgs) |> OS.Cmd.run >>= fun () ->
+    Cmd.(v "parallel" % "--controlmaster" % "--timeout" % "300" % "--progress" % "--joblog" % p joblog_f % "--no-notice" % "-S" % hosts_l % "./ocaml-docker" % "phase5-build" %% of_list opts % "{}" % "-vvv" % ":::" %% of_list pkgs) |> OS.Cmd.run_status >>= fun _ ->
     Cmd.(v "parallel" % "--no-notice" % "rsync" % "-av" % "{}:_logs" % "." % ":::" %% of_list hosts) |> OS.Cmd.run >>= fun () ->
     Ok ()
 end
