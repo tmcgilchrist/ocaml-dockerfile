@@ -406,11 +406,9 @@ module Phases = struct
     let open Bos in 
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
     let hosts_l = String.concat "," (List.map (fun s -> "30/"^s) hosts) in
-    Cmd.(v "cp" % "./_buildmirage/default/bin/ocaml_docker.exe" % "./ocaml-docker") |>
     OS.Cmd.run >>= fun () ->
     Bos.OS.File.read_lines Fpath.(logs_dir / "pkgs.txt") >>= fun pkgs ->
     C.iter (fun host ->
-      Cmd.(v "rsync" % "-a" % "./_build/default/bin/ocaml_docker.exe" % (host^":ocaml-docker")) |>
       OS.Cmd.run >>= fun () ->
       Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "--nonall" % "./ocaml-docker" % "phase5-setup" % "-vvv") |> OS.Cmd.run >>=	fun () ->
       Cmd.(v "parallel" % "--no-notice" % "-S" % hosts_l % "echo" % "./ocaml-docker" % "phase5-build" % "{}" % "-vvv" % ":::" %% of_list pkgs) |> OS.Cmd.run
