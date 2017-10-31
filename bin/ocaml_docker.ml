@@ -378,12 +378,10 @@ module Phases = struct
     let cmd = Cmd.(v "docker" % "volume" % "rm" % "-f" % "opam2-archive") in
     OS.Cmd.(run cmd) >>= fun () ->
     (* TODO docker pull archive *)
-    let cmd = Cmd.(v "docker" % "run" % "--name=create-opam2-archive" % "--mount" %
+    let cmd = Cmd.(v "docker" % "run" % "--rm" % "--name=create-opam2-archive" % "--mount" %
       "source=opam2-archive,destination=/home/opam/opam-repository/cache" %
       Fmt.strf "%s:opam2-archive" staging_hub_id % "true") in
-    OS.Cmd.(run cmd) >>= fun () ->
-    OS.Cmd.(run Cmd.(v "docker" % "rm" % "create-opam2-archive")) >>= fun () ->
-    Ok ()
+    OS.Cmd.(run cmd)
   
   let phase5_build {arch;cache;staging_hub_id;prod_hub_id;build;build_dir;logs_dir} pkg () =
     let arch_s = arch_to_docker arch in 
@@ -395,12 +393,12 @@ module Phases = struct
     let open Bos in 
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
     let img = Fmt.strf "%s:base-linux-%s" staging_hub_id tag_frag in
-    Cmd.(v "docker" % "run" % "-v" % "opam2-archive:/home/opam/.opam/download-cache" % img % "opam" % "depext" % "-i" % pkg) |>
+    Cmd.(v "docker" % "run" % "--rm" % "-v" % "opam2-archive:/home/opam/.opam/download-cache" % img % "opam" % "depext" % "-i" % pkg) |>
     C.Mdlog.run_cmd md pkg
 
   let phase5_cluster {build_dir;logs_dir} hosts () =
     let open Bos in
-    let hosts_l = String.concat "," hosts in
+    let hosts_l = String.concat "," (List.map (fun s -> "30/"^s) hosts) in
     setup_log_dirs ~prefix:"cluster" build_dir logs_dir @@ fun build_dir md ->
     Cmd.(v "cp" % "./_build/default/bin/ocaml_docker.exe" % "./ocaml-docker") |>
     OS.Cmd.run >>= fun () ->
