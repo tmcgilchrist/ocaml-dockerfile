@@ -370,8 +370,8 @@ module Phases = struct
     let pkgs_list = Fpath.(build_dir / "pkgs.txt") in
     Bos.OS.Cmd.(run_out (C.Docker.run_cmd tag opam_cmd) |> to_file pkgs_list) >>= fun () ->
     if_opt push @@ fun () ->
-    let cmd = C.Docker.push_cmd tag in
-    C.Mdlog.run_parallel ~retries:1 md "02-push" cmd args
+    let cmd = C.Docker.push_cmd "{}" in
+    C.Mdlog.run_parallel ~retries:1 md "02-push" cmd [tag]
 
   let phase5_setup {staging_hub_id} () =
     let open Bos in 
