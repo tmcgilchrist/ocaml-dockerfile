@@ -502,12 +502,18 @@ let phase5_build =
   Term.(term_result (const Phases.phase5_build $ copts_t $ pkg $ setup_logs)),
   Term.info "phase5-build" ~doc ~exits
 
+let phase5_cluster =
+  let doc = "run cluster build" in
+  let exits = Term.default_exits in
+  Term.(term_result (const Phases.phase5_cluster $ copts_t $ ssh_hosts $ setup_logs)),
+  Term.info "phase5-cluster" ~doc ~exits
+
 let default_cmd =
   let doc = "build and push opam and OCaml multiarch container images" in
   let sdocs = Manpage.s_common_options in
   Term.(ret (const (fun _ -> `Help (`Pager, None)) $ pure ())),
   Term.info "obi-docker" ~version:"v1.0.0" ~doc ~sdocs
 
-let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_ocaml_cmd; phase4_cmd; phase5_cmd; phase5_build; phase5_setup]
+let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_ocaml_cmd; phase4_cmd; phase5_cmd; phase5_build; phase5_setup; phase5_cluster]
 let () = Term.(exit @@ eval_choice default_cmd cmds)
 
