@@ -371,13 +371,14 @@ module Phases = struct
     Bos.OS.Cmd.(run_out (C.Docker.run_cmd tag opam_cmd) |> to_file pkgs_list) >>= fun () ->
     Ok ()
 
-  let phase5_setup copts () =
+  let phase5_setup {staging_hub_id} () =
     let open Bos in 
     let cmd = Cmd.(v "docker" % "volume" % "rm" % "-f" % "opam2-archive") in
     OS.Cmd.(run cmd) >>= fun () ->
+    (* TODO docker pull archive *)
     let cmd = Cmd.(v "docker" % "run" % "--name=create-opam2-archive" % "--mount" %
       "source=opam2-archive,destination=/home/opam/opam-repository/cache" %
-      "opam2-archive" % "true") in
+      Fmt.strf "%s:opam2-archive" staging_hub_id % "true") in
     OS.Cmd.(run cmd) >>= fun () ->
     OS.Cmd.(run Cmd.(v "docker" % "rm" % "create-opam2-archive")) >>= fun () ->
     Ok ()
