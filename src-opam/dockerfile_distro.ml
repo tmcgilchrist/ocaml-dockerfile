@@ -265,11 +265,10 @@ let rec human_readable_string_of_distro (d:t) =
   |`Alpine `V3_4 -> "Alpine 3.4"
   |`Alpine `V3_5 -> "Alpine 3.5"
   |`Alpine `V3_6 -> "Alpine 3.6"
-  |`Alpine `Latest -> "Alpine Stable (3.6)"
   |`OpenSUSE `V42_1 -> "OpenSUSE 42.1"
   |`OpenSUSE `V42_2 -> "OpenSUSE 42.2"
   |`OpenSUSE `V42_3 -> "OpenSUSE 42.3"
-  |`Ubuntu `Latest | `Ubuntu `LTS | `CentOS `Latest | `Fedora `Latest
+  |`Alpine `Latest | `Ubuntu `Latest | `Ubuntu `LTS | `CentOS `Latest | `Fedora `Latest
   |`OracleLinux `Latest | `OpenSUSE `Latest -> alias ()
 
 let human_readable_short_string_of_distro (t:t) =
