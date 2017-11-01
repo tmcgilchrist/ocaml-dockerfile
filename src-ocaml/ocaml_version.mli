@@ -37,10 +37,11 @@ end
 module Has : sig
   val bytes : t -> bool
   val arch : arch -> t -> bool
-  val variants : t -> string list
 end
 
 module Opam : sig
+  val variants : t -> string list
+  val default_variant : t -> string option
   val default_switch : t -> string
   val variants : t -> string list
 end

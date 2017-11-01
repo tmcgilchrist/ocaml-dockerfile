@@ -91,32 +91,34 @@ module Has = struct
     |(-1) | 0 -> true
     |n -> false
 
-  let variants {major;minor;_} =
-    match major,minor with
-    |4,7 -> ["trunk";"trunk+afl";"trunk+flambda"]
-    |4,6 -> ["rc1";"rc1+afl";"rc1+flambda";"rc1+default-unsafe-string";"rc1+force-safe-string"]
-    |4,5 -> ["afl";"flambda"]
-    |4,4 -> ["flambda"]
-    |4,3 -> ["flambda"]
-    |_ -> []
-
-  let default_variant {major;minor;_} =
-    match major,minor with
-    |4,7 -> Some "trunk"
-    |4,6 -> Some "rc1"
-    |4,5 -> None
-    |4,4 -> None
-    |4,3 -> None
-    |_ -> None
 end
 
 module Opam = struct
+
+  let variants {major; minor; _} =
+    match major,minor with
+    | 4,7 -> ["trunk";"trunk+afl";"trunk+flambda"]
+    | 4,6 -> ["rc1";"rc1+afl";"rc1+flambda";"rc1+default-unsafe-string";"rc1+force-safe-string"]
+    | 4,5 -> ["afl";"flambda"]
+    | 4,4 -> ["flambda"]
+    | 4,3 -> ["flambda"]
+    | _ -> []
+
+  let default_variant {major; minor; _} =
+    match major,minor with
+    | 4,7 -> Some "trunk"
+    | 4,6 -> Some "rc1"
+    | 4,5 -> None
+    | 4,4 -> None
+    | 4,3 -> None
+    | _ -> None
+
   let default_switch t =
-    to_string { t with extra = Has.default_variant t }
+    to_string { t with extra = default_variant t }
 
   let variants ov =
-    let default_variant = Has.default_variant ov in
-    Has.variants ov |>
+    let default_variant = default_variant ov in
+    variants ov |>
     List.filter (fun extra -> default_variant <> (Some extra)) |>
     List.map (fun extra -> to_string { ov with extra = Some extra })
 end
