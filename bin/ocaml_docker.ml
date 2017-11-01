@@ -45,6 +45,7 @@ module Gen = struct
     L.Apk.install "build-base tar ca-certificates git rsync curl sudo bash" @@ 
     L.Apk.add_user ~uid:1000 ~sudo:true "opam" @@
     L.Git.init () @@
+    entrypoint_exec ["opam";"config";"exec";"--"] @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
   (* Debian based Dockerfile *)
@@ -59,13 +60,25 @@ module Gen = struct
     L.Apt.install "build-essential curl git rsync sudo unzip" @@
     L.Apt.add_user ~uid:1000 ~sudo:true "opam" @@
     L.Git.init () @@
+    entrypoint_exec ["opam";"config";"exec";"--"] @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
   (* RPM based Dockerfile *)
   let yum_opam2 ?(labels=[]) ~distro ~tag () =
+  let centos6_modern_git = match distro,tag with "centos","6" ->
+    run "curl -OL http://packages.sw.be/rpmforge-release/rpmforge-release-0.5.2-2.el6.rf.x86_64.rpm" @@
+    run "rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt" @@
+    run "rpm -K rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
+    run "rpm -i rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
+    run "rm -f rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
+    run "yum -y --disablerepo=base,updates --enablerepo=rpmforge-extras update git"
+    |_ -> empty in
+
+
     header distro tag @@
     label (("distro_style", "apt")::labels) @@
     L.RPM.update @@
+    centos6_modern_git @@
     L.RPM.dev_packages ~extra:"which tar curl xz" () @@
     install_opam_from_source ~prefix:"/usr" ~install_wrappers:true ~branch:"master" () @@
     from ~tag distro @@
@@ -73,8 +86,10 @@ module Gen = struct
     L.RPM.dev_packages ~extra:"which tar curl xz" () @@
     copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
+    run "sed -i.bak '/LC_TIME LC_ALL LANGUAGE/aDefaults    env_keep += \"OPAMYES OPAMJOBS OPAMVERBOSE\"' /etc/sudoers" @@
     L.RPM.add_user ~uid:1000 ~sudo:true "opam" @@ (** TODO pin uid at 1000 *)
     L.Git.init () @@
+    entrypoint_exec ["opam";"config";"exec";"--"] @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
   (* Zypper based Dockerfile *)
@@ -89,6 +104,7 @@ module Gen = struct
     copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
     L.Zypper.add_user ~uid:1000 ~sudo:true "opam" @@
     L.Git.init () @@
+    entrypoint_exec ["opam";"config";"exec";"--"] @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
   (* Generate archive mirror *)

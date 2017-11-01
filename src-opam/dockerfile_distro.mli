@@ -113,16 +113,3 @@ val human_readable_short_string_of_distro : t -> string
 
 val compare : t -> t -> int
 (** [compare a b] is a lexical comparison function for {!t}. *)
-
-(** {2 Dockerfile generation} *)
-
-val to_dockerfile :
-  ?pin:string ->
-  ?opam_version:string ->
-  ocaml_version:string ->
-  distro:t -> unit -> Dockerfile.t
-(** [to_dockerfile ?pin ~ocaml_version ~distro] generates
-   a Dockerfile for [distro], with OPAM installed and the
-   current switch pointing to [ocaml_version]. If [pin]
-   is specified then an [opam pin add <pin>] will be added
-   to the initialisation. *)
