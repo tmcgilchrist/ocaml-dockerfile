@@ -21,51 +21,8 @@ open Dockerfile
 open Printf
 module Linux = Dockerfile_linux
 
-(** Rules to get the cloud solver if no aspcud available *)
-let install_cloud_solver =
-  run "curl -o /usr/bin/aspcud 'https://raw.githubusercontent.com/avsm/opam-solver-proxy/38133c7f82bae3f1aa9f7505901f26d9fb0ed1ee/aspcud.docker'" @@
-  run "chmod 755 /usr/bin/aspcud"
-
-(** RPM rules *)
-module RPM = struct
-
-  let install_system_opam = function
-  | `CentOS7 -> Linux.RPM.install "opam aspcud"
-  | `CentOS6 -> Linux.RPM.install "opam" @@ install_cloud_solver
-
-end
-
-(** Debian rules *)
-module Apt = struct
-
-  let install_system_opam =
-    Linux.Apt.install "opam aspcud"
-end
-
 let run_as_opam fmt = Linux.run_as_user "opam" fmt
 let opamhome = "/home/opam"
-
-let opam_init
-  ?(branch="master")
-  ?(repo="git://github.com/ocaml/opam-repository")
-  ?(need_upgrade=false)
-  ?compiler_version () =
-    let is_mainline = function (* FIXME only covers the compilers we use *)
-      |"4.05.0"|"4.04.2"|"4.04.1"|"4.04.0"|"4.03.0"|"4.02.3"|"4.01.0"|"4.00.1" -> true
-      |_ -> false in
-    let compiler =
-      match compiler_version, need_upgrade with
-      | None, _ -> ""
-      | Some v, false -> "--comp " ^ v ^ " "
-      | Some v, true when is_mainline v -> "--comp ocaml-base-compiler." ^ v ^ " "
-      | Some v, true -> "--comp ocaml-variants." ^ v ^ " "
-    in
-    let master_cmds = match need_upgrade with
-      | true -> run_as_opam "cd %s/opam-repository && opam admin upgrade && git checkout -b v2 && git add . && git commit -a -m 'opam admin upgrade'" opamhome
-      | false -> empty in
-    run_as_opam "git clone -b %s %s" branch repo @@
-    master_cmds @@
-    run_as_opam "opam init -a -y %s%s/opam-repository" compiler opamhome
 
 let install_opam_from_source ?(prefix="/usr/local") ?(install_wrappers=false) ?(branch="1.2") () =
   run "git clone -b %s git://github.com/ocaml/opam /tmp/opam" branch @@
@@ -89,34 +46,79 @@ let header ?maintainer img tag =
   from ~tag img @@
   maintainer
 
-let run_command fmt =
-  ksprintf (fun cmd -> 
-    eprintf "Exec: %s\n%!" cmd;
-    match Sys.command cmd with
-    | 0 -> ()
-    | _ -> raise (Failure cmd)
-  ) fmt
+ (* Apk based Dockerfile *)
+  let apk_opam2 ?(labels=[]) ~distro ~tag () =
+    header distro tag @@
+    label (("distro_style", "apk")::labels) @@
+    Linux.Apk.install "build-base bzip2 git tar curl ca-certificates" @@
+    install_opam_from_source ~install_wrappers:true ~branch:"master" () @@
+    run "strip /usr/local/bin/opam*" @@
+    from ~tag distro @@
+    copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
+    copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
+    Linux.Apk.install "build-base tar ca-certificates git rsync curl sudo bash" @@ 
+    Linux.Apk.add_user ~uid:1000 ~sudo:true "opam" @@
+    Linux.Git.init () @@
+    entrypoint_exec ["opam";"config";"exec";"--"] @@
+    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
-let write_to_file file dfile =
-  eprintf "Open: %s\n%!" file;
-  let fout = open_out file in
-  output_string fout (string_of_t dfile);
-  close_out fout
+  (* Debian based Dockerfile *)
+  let apt_opam2 ?(labels=[]) ~distro ~tag () =
+    header distro tag @@
+    label (("distro_style", "apt")::labels) @@
+    Linux.Apt.install "build-essential curl git" @@
+    install_opam_from_source ~install_wrappers:true ~branch:"master" () @@
+    from ~tag distro @@
+    copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
+    copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
+    Linux.Apt.install "build-essential curl git rsync sudo unzip" @@
+    Linux.Apt.add_user ~uid:1000 ~sudo:true "opam" @@
+    Linux.Git.init () @@
+    entrypoint_exec ["opam";"config";"exec";"--"] @@
+    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
-let generate_dockerfiles d output_dir =
-  List.iter (fun (name, docker) ->
-    printf "Generating: %s/%s/Dockerfile\n" output_dir name;
-    run_command "mkdir -p %s/%s" output_dir name;
-    write_to_file (output_dir ^ "/" ^ name ^ "/Dockerfile") docker
-  ) d
+  (* RPM based Dockerfile *)
+  let yum_opam2 ?(labels=[]) ~distro ~tag () =
+  let centos6_modern_git =
+    match distro,tag with "TODOcentos","6" ->
+    run "curl -OL http://packages.sw.be/rpmforge-release/rpmforge-release-0.5.2-2.el6.rf.x86_64.rpm" @@
+    run "rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt" @@
+    run "rpm -K rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
+    run "rpm -i rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
+    run "rm -f rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
+    run "yum -y --disablerepo=base,updates --enablerepo=rpmforge-extras update git"
+    |_ -> empty in
 
-let generate_dockerfiles_in_git_branches d output_dir =
-  List.iter (fun (name, docker) ->
-    printf "Switching to branch %s in %s\n" name output_dir;
-    run_command "git -C \"%s\" checkout -q -B %s master" output_dir name;
-    let file = output_dir ^ "/Dockerfile" in
-    write_to_file file docker;
-    run_command "git -C \"%s\" add Dockerfile" output_dir;
-    run_command "git -C \"%s\" commit -q -m \"update %s Dockerfile\" -a" output_dir name
-  ) d;
-  run_command "git -C \"%s\" checkout -q master" output_dir
+    header distro tag @@
+    label (("distro_style", "apt")::labels) @@
+    Linux.RPM.update @@
+    centos6_modern_git @@
+    Linux.RPM.dev_packages ~extra:"which tar curl xz" () @@
+    install_opam_from_source ~prefix:"/usr" ~install_wrappers:true ~branch:"master" () @@
+    from ~tag distro @@
+    Linux.RPM.update @@
+    Linux.RPM.dev_packages ~extra:"which tar curl xz" () @@
+    copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
+    copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
+    run "sed -i.bak '/LC_TIME LC_ALL LANGUAGE/aDefaults    env_keep += \"OPAMYES OPAMJOBS OPAMVERBOSE\"' /etc/sudoers" @@
+    Linux.RPM.add_user ~uid:1000 ~sudo:true "opam" @@ (** TODO pin uid at 1000 *)
+    Linux.Git.init () @@
+    entrypoint_exec ["opam";"config";"exec";"--"] @@
+    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
+
+  (* Zypper based Dockerfile *)
+  let zypper_opam2 ?(labels=[]) ~distro ~tag () =
+    header distro tag @@
+    label (("distro_style", "zypper")::labels) @@
+    Linux.Zypper.dev_packages () @@
+    install_opam_from_source ~prefix:"/usr" ~install_wrappers:true ~branch:"master" () @@
+    from ~tag distro @@
+    Linux.Zypper.dev_packages () @@
+    copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
+    copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
+    Linux.Zypper.add_user ~uid:1000 ~sudo:true "opam" @@
+    Linux.Git.init () @@
+    entrypoint_exec ["opam";"config";"exec";"--"] @@
+    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
+
+
