@@ -51,7 +51,7 @@ module Gen = struct
   let all_ocaml_compilers hub_id arch distro =
     let distro = D.tag_of_distro distro in
     let compilers =
-      OV.Releases.recent_major_and_dev |>
+      OV.Releases.recent_major |>
       List.filter (OV.Has.arch arch) |>
       List.map OV.Opam.default_switch |>
       List.map (run "opam switch create %s") |> (@@@) empty in
