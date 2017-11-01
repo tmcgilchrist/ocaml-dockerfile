@@ -39,7 +39,37 @@ let compare {major; minor; patch; extra} a =
       compare patch a.patch ++ fun () ->
         compare extra a.extra
 
-let t = of_string Sys.ocaml_version
+let sys_version = of_string Sys.ocaml_version
+
+module Releases = struct
+  let v4_00_1 = of_string "4.00.1"
+  let v4_01_0 = of_string "4.01.0"
+  let v4_02_0 = of_string "4.02.0"
+  let v4_02_1 = of_string "4.02.1"
+  let v4_02_2 = of_string "4.02.2"
+  let v4_02_3 = of_string "4.02.3"
+  let v4_03_0 = of_string "4.03.0"
+  let v4_04_0 = of_string "4.04.0"
+  let v4_04_1 = of_string "4.04.1"
+  let v4_04_2 = of_string "4.04.2"
+  let v4_05_0 = of_string "4.05.0"
+
+  let all = [
+    v4_00_1;
+    v4_01_0; v4_02_0; v4_02_1; v4_02_2; v4_02_3;
+    v4_03_0; v4_04_0; v4_04_1; v4_04_2; v4_05_0
+  ]
+
+  let all_major = [ v4_00_1; v4_01_0; v4_02_3; v4_03_0; v4_04_2; v4_05_0 ]
+
+  let recent_major = [ v4_02_3; v4_03_0; v4_04_2; v4_05_0 ]
+
+  let dev = [ of_string "4.06.0"; of_string "4.07.0" ]
+
+  let recent_major_and_dev = List.concat [recent_major;dev]
+
+  let latest_major = v4_05_0
+end
 
 type arch = [`X86_64 | `Aarch64 ]
 module Since = struct
@@ -63,10 +93,30 @@ module Has = struct
 
   let variants {major;minor;_} =
     match major,minor with
-    |4,7 -> ["afl";"flambda"]
-    |4,6 -> ["afl";"flambda";"+rc1+default-unsafe-string";"+rc1+force-safe-string"]
+    |4,7 -> ["trunk";"trunk+afl";"trunk+flambda"]
+    |4,6 -> ["rc1";"rc1+afl";"rc1+flambda";"rc1+default-unsafe-string";"rc1+force-safe-string"]
     |4,5 -> ["afl";"flambda"]
     |4,4 -> ["flambda"]
     |4,3 -> ["flambda"]
     |_ -> []
+
+  let default_variant {major;minor;_} =
+    match major,minor with
+    |4,7 -> Some "trunk"
+    |4,6 -> Some "rc1"
+    |4,5 -> None
+    |4,4 -> None
+    |4,3 -> None
+    |_ -> None
+end
+
+module Opam = struct
+  let default_switch t =
+    to_string { t with extra = Has.default_variant t }
+
+  let variants ov =
+    let default_variant = Has.default_variant ov in
+    Has.variants ov |>
+    List.filter (fun extra -> default_variant <> (Some extra)) |>
+    List.map (fun extra -> to_string { ov with extra = Some extra })
 end

@@ -3,10 +3,14 @@ module L = Dockerfile_linux
 module D = Dockerfile_distro
 module C = Dockerfile_cmd
 module G = Dockerfile_gen
+module OV = Ocaml_version
 
 let arch_to_docker = function
  | `X86_64 -> "amd64"
  | `Aarch64 -> "arm64"
+
+let tag_of_ocaml_version ov =
+  Ocaml_version.to_string ov |> String.map (function '+' -> '-' | x -> x) 
 
 module Log_gen = struct
 
@@ -65,7 +69,8 @@ module Gen = struct
 
   (* RPM based Dockerfile *)
   let yum_opam2 ?(labels=[]) ~distro ~tag () =
-  let centos6_modern_git = match distro,tag with "centos","6" ->
+  let centos6_modern_git =
+    match distro,tag with "TODOcentos","6" ->
     run "curl -OL http://packages.sw.be/rpmforge-release/rpmforge-release-0.5.2-2.el6.rf.x86_64.rpm" @@
     run "rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt" @@
     run "rpm -K rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
@@ -73,7 +78,6 @@ module Gen = struct
     run "rm -f rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
     run "yum -y --disablerepo=base,updates --enablerepo=rpmforge-extras update git"
     |_ -> empty in
-
 
     header distro tag @@
     label (("distro_style", "apt")::labels) @@
@@ -121,9 +125,9 @@ module Gen = struct
   let all_ocaml_compilers hub_id arch distro =
     let distro = D.tag_of_distro distro in
     let compilers =
-      D.stable_ocaml_versions |>
-      List.filter (D.ocaml_supported_on arch) |>
-      List.map D.ocaml_version_to_opam_switch |>
+      OV.Releases.recent_major_and_dev |>
+      List.filter (OV.Has.arch arch) |>
+      List.map OV.Opam.default_switch |>
       List.map (run "opam switch create %s") |> (@@@) empty in
     let d = 
       header hub_id (Fmt.strf "%s-opam" distro) @@
@@ -135,11 +139,11 @@ module Gen = struct
 
   let separate_ocaml_compilers hub_id arch distro =
     let distro = D.tag_of_distro distro in
-    D.stable_ocaml_versions |>
-    List.filter (D.ocaml_supported_on arch) |>
+    OV.Releases.recent_major_and_dev |> List.filter (OV.Has.arch arch) |>
     List.map (fun ov ->
-      let default_switch = D.ocaml_version_to_opam_switch ov in
-      let variants = List.map (run "opam switch create %s+%s" default_switch) Ocaml_version.(of_string ov |> Has.variants) |> (@@@) empty in
+      let default_switch = OV.Opam.default_switch ov in
+      let variants =
+        List.map (run "opam switch create %s") (OV.Opam.variants ov) |> (@@@) empty in
       let d = 
         header hub_id (Fmt.strf "%s-opam" distro) @@
         run "cd /home/opam/opam-repository && git pull origin master" @@
@@ -147,7 +151,7 @@ module Gen = struct
         variants @@
         run "opam switch %s" default_switch
       in
-      (Fmt.strf "%s-ocaml-%s" distro (D.tag_of_ocaml_version ov)), d
+      (Fmt.strf "%s-ocaml-%s" distro (tag_of_ocaml_version ov)), d
     )
 
   let bulk_build distro arch prod_hub_id distro ocaml_version variant opam_repo_tag =
@@ -238,7 +242,6 @@ type build_t = {
   variant: string option;
   distro: D.t
 }
-
 
 module Phases = struct
 
@@ -352,18 +355,18 @@ module Phases = struct
           Gen.multiarch_manifest ~target ~platforms |> fun m ->
           tag, m in
         let each_ocaml = List.map (fun ov ->
-          let target = Fmt.strf "%s:%s-ocaml-%s" prod_hub_id tag ov in
+          let target = Fmt.strf "%s:%s-ocaml-%a" prod_hub_id tag OV.pp ov in
           let platforms =
             D.distro_arches distro |>
-            List.filter (fun a -> Ocaml_version.(Has.arch a (of_string ov))) |>
+            List.filter (fun a -> OV.(Has.arch a ov)) |>
             List.map (fun arch ->
               let arch = arch_to_docker arch in
-              let image = Fmt.strf "%s:%s-ocaml-%s-linux-%s" staging_hub_id tag ov arch in
+              let image = Fmt.strf "%s:%s-ocaml-%a-linux-%s" staging_hub_id tag OV.pp ov arch in
               image, arch) in
-          let tag = Fmt.strf "%s-ocaml-%s" tag ov in
+          let tag = Fmt.strf "%s-ocaml-%a" tag OV.pp ov in
           Gen.multiarch_manifest ~target ~platforms |> fun m ->
           tag,m 
-        ) D.stable_ocaml_versions in
+        ) OV.Releases.recent_major in
         mega_ocaml :: each_ocaml
       ) D.active_distros |> List.flatten in
     C.iter (fun (t,m) -> Bos.OS.File.write (yaml_file t) m) yamls >>= fun () ->

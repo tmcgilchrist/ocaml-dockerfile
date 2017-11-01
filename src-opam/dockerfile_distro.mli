@@ -56,27 +56,6 @@ val master_distro : t
 (** The distribution that is the top-level alias for the [latest] tag
     in the [ocaml/opam] Docker Hub build. *)
 
-val stable_ocaml_versions : string list
-(** Enumeration of released OCaml compiler versions. The latest patch
-    branch of each release is picked. *)
-
-val dev_ocaml_versions : string list
-(** Enumerations of development OCaml compiler versions. *)
-
-val all_ocaml_versions : string list
-(** Enumeration of released OCaml compiler versions. In addition to the
-    {!stable_ocaml_versions}, trunk builds for the latest releases may
-    also be included. *)
-
-val latest_ocaml_version : string
-(** The latest stable OCaml release. *)
-
-val opam_versions : string list
-(** Enumeration of supported OPAM package manager versions. *)
-
-val latest_opam_version : string
-(** The latest stable OPAM release. *)
-
 val builtin_ocaml_of_distro : t -> string option
 (** [builtin_ocaml_of_distro t] will return the OCaml version
   supplied with the distribution packaging, and [None] if there
@@ -89,12 +68,6 @@ val tag_of_distro : t -> string
 val distro_of_tag : string -> t option
 (** [distro_of_tag s] parses [s] into a {!t} distribution, and
     [None] otherwise. *)
-
-val ocaml_version_to_opam_switch : string -> string
-(* TODO *)
-
-val tag_of_ocaml_version : string -> string
-(* TODO *)
 
 val latest_tag_of_distro : t -> string
 (** [latest_tag_of_dsistro distro] will generate a Docker Hub

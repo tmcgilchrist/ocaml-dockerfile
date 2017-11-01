@@ -85,16 +85,6 @@ let latest_distros =
 
 let master_distro = `Debian `Stable
 
-let stable_ocaml_versions =
-  (* TODO move into ocaml-versions *)
-  [ "4.02.3"; "4.03.0"; "4.04.2"; "4.05.0"; "4.06.0" ]
-
-let dev_ocaml_versions = [ "4.07.0"; "4.07.0" ]
-let all_ocaml_versions = stable_ocaml_versions @ dev_ocaml_versions
-let latest_ocaml_version = "4.05.0"
-let opam_versions = [ "1.2.2" ]
-let latest_opam_version = "1.2.2"
-
 let resolve_alias d =
   match distro_status d with
   | `Alias x -> x
@@ -306,12 +296,3 @@ let latest_tag_of_distro (t:t) =
 let compare a b =
   String.compare (human_readable_string_of_distro a) (human_readable_string_of_distro b)
 
-let ocaml_version_to_opam_switch = function
-  |"4.06.0" -> "4.06.0+trunk"
-  |"4.06.0+flambda" -> "4.06.0+trunk+flambda"
-  |"4.07.0" -> "4.07.0+trunk"
-  |"4.07.0+flambda" -> "4.07.0+trunk+flambda"
-  |ov -> ov
-
-let tag_of_ocaml_version ov =
-  String.map (function '+' -> '-' | x -> x) ov
