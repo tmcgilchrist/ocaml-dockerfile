@@ -20,6 +20,7 @@
 open Dockerfile
 open Printf
 module Linux = Dockerfile_linux
+module D = Dockerfile_distro
 
 let run_as_opam fmt = Linux.run_as_user "opam" fmt
 let opamhome = "/home/opam"
@@ -120,5 +121,57 @@ let header ?maintainer img tag =
     Linux.Git.init () @@
     entrypoint_exec ["opam";"config";"exec";"--"] @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
+
+  let gen_opam2_distro ?labels d =
+    let fn =
+     match D.resolve_alias d with
+     | `Alpine v ->
+      let tag = match v with
+        | `V3_3 -> "3.3" | `V3_4 -> "3.4"
+        | `V3_5 -> "3.5" | `V3_6 -> "3.6"
+        | `Latest -> assert false in
+      apk_opam2 ?labels ~distro:"alpine" ~tag ()
+     | `Debian v ->
+      let tag = match v with
+        | `V7 -> "7"
+        | `V8 -> "8"
+        | `V9 -> "9"
+        | `Testing -> "testing"
+        | `Unstable -> "unstable"
+        | `Stable -> assert false in
+      apt_opam2 ?labels ~distro:"debian" ~tag ()
+    | `Ubuntu v ->
+      let tag = match v with
+        | `V12_04 -> "precise"
+        | `V14_04 -> "trusty"
+        | `V16_04 -> "xenial"
+        | `V16_10 -> "yakkety"
+        | `V17_04 -> "zesty"
+        | `V17_10 -> "artful"
+        | _ -> assert false in
+      apt_opam2 ?labels ~distro:"ubuntu" ~tag ()
+   | `CentOS v ->
+      let tag = match v with
+        | `V6 -> "6"
+        | `V7 -> "7"
+        | _ -> assert false in
+      yum_opam2 ?labels ~distro:"centos" ~tag ()
+   | `Fedora v ->
+      let tag = match v with
+        | `V21 -> "21" | `V22 -> "22" | `V23 -> "23" | `V24 -> "24"
+        | `V25 -> "25" | `V26 -> "26"
+        | _ -> assert false in
+      yum_opam2 ?labels ~distro:"fedora" ~tag ()
+   | `OracleLinux v ->
+      let tag = match v with
+        | `V7 -> "7" 
+        | _ -> assert false in
+      yum_opam2 ?labels ~distro:"oraclelinux" ~tag ()
+   | `OpenSUSE v ->
+      let tag = match v with
+        | `V42_1 -> "42.1"  | `V42_2 -> "42.2" | `V42_3 -> "42.3"
+        | _ -> assert false in
+      zypper_opam2 ?labels ~distro:"opensuse" ~tag ()
+   in (D.tag_of_distro d), fn
 
 

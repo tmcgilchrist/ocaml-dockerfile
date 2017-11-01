@@ -3,6 +3,7 @@ module L = Dockerfile_linux
 module D = Dockerfile_distro
 module C = Dockerfile_cmd
 module G = Dockerfile_gen
+module O = Dockerfile_opam
 module OV = Ocaml_version
 
 let arch_to_docker = function
@@ -36,81 +37,6 @@ end
 module Gen = struct
   open Dockerfile
   open Dockerfile_opam
-  (* Apk based Dockerfile *)
-  let apk_opam2 ?(labels=[]) ~distro ~tag () =
-    header distro tag @@
-    label (("distro_style", "apk")::labels) @@
-    L.Apk.install "build-base bzip2 git tar curl ca-certificates" @@
-    install_opam_from_source ~install_wrappers:true ~branch:"master" () @@
-    run "strip /usr/local/bin/opam*" @@
-    from ~tag distro @@
-    copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
-    copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
-    L.Apk.install "build-base tar ca-certificates git rsync curl sudo bash" @@ 
-    L.Apk.add_user ~uid:1000 ~sudo:true "opam" @@
-    L.Git.init () @@
-    entrypoint_exec ["opam";"config";"exec";"--"] @@
-    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
-
-  (* Debian based Dockerfile *)
-  let apt_opam2 ?(labels=[]) ~distro ~tag () =
-    header distro tag @@
-    label (("distro_style", "apt")::labels) @@
-    L.Apt.install "build-essential curl git" @@
-    install_opam_from_source ~install_wrappers:true ~branch:"master" () @@
-    from ~tag distro @@
-    copy ~from:"0" ~src:["/usr/local/bin/opam"] ~dst:"/usr/bin/opam" () @@
-    copy ~from:"0" ~src:["/usr/local/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
-    L.Apt.install "build-essential curl git rsync sudo unzip" @@
-    L.Apt.add_user ~uid:1000 ~sudo:true "opam" @@
-    L.Git.init () @@
-    entrypoint_exec ["opam";"config";"exec";"--"] @@
-    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
-
-  (* RPM based Dockerfile *)
-  let yum_opam2 ?(labels=[]) ~distro ~tag () =
-  let centos6_modern_git =
-    match distro,tag with "TODOcentos","6" ->
-    run "curl -OL http://packages.sw.be/rpmforge-release/rpmforge-release-0.5.2-2.el6.rf.x86_64.rpm" @@
-    run "rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt" @@
-    run "rpm -K rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
-    run "rpm -i rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
-    run "rm -f rpmforge-release-0.5.2-2.el6.rf.*.rpm" @@
-    run "yum -y --disablerepo=base,updates --enablerepo=rpmforge-extras update git"
-    |_ -> empty in
-
-    header distro tag @@
-    label (("distro_style", "apt")::labels) @@
-    L.RPM.update @@
-    centos6_modern_git @@
-    L.RPM.dev_packages ~extra:"which tar curl xz" () @@
-    install_opam_from_source ~prefix:"/usr" ~install_wrappers:true ~branch:"master" () @@
-    from ~tag distro @@
-    L.RPM.update @@
-    L.RPM.dev_packages ~extra:"which tar curl xz" () @@
-    copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
-    copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
-    run "sed -i.bak '/LC_TIME LC_ALL LANGUAGE/aDefaults    env_keep += \"OPAMYES OPAMJOBS OPAMVERBOSE\"' /etc/sudoers" @@
-    L.RPM.add_user ~uid:1000 ~sudo:true "opam" @@ (** TODO pin uid at 1000 *)
-    L.Git.init () @@
-    entrypoint_exec ["opam";"config";"exec";"--"] @@
-    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
-
-  (* Zypper based Dockerfile *)
-  let zypper_opam2 ?(labels=[]) ~distro ~tag () =
-    header distro tag @@
-    label (("distro_style", "zypper")::labels) @@
-    L.Zypper.dev_packages () @@
-    install_opam_from_source ~prefix:"/usr" ~install_wrappers:true ~branch:"master" () @@
-    from ~tag distro @@
-    L.Zypper.dev_packages () @@
-    copy ~from:"0" ~src:["/usr/bin/opam"] ~dst:"/usr/bin/opam" () @@
-    copy ~from:"0" ~src:["/usr/bin/opam-installer"] ~dst:"/usr/bin/opam-installer" () @@
-    L.Zypper.add_user ~uid:1000 ~sudo:true "opam" @@
-    L.Git.init () @@
-    entrypoint_exec ["opam";"config";"exec";"--"] @@
-    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
-
   (* Generate archive mirror *)
   let opam2_mirror (hub_id:string) =
     header hub_id "alpine-3.6-opam" @@
@@ -163,58 +89,6 @@ module Gen = struct
     run "opam depext -uiy jbuilder ocamlfind"  |> fun dfile ->
     ["base", dfile]
 
-  let gen_opam_for_distro ?labels d =
-    let fn =
-     match D.resolve_alias d with
-     | `Alpine v ->
-      let tag = match v with
-        | `V3_3 -> "3.3" | `V3_4 -> "3.4"
-        | `V3_5 -> "3.5" | `V3_6 -> "3.6"
-        | `Latest -> assert false in
-      apk_opam2 ?labels ~distro:"alpine" ~tag ()
-     | `Debian v ->
-      let tag = match v with
-        | `V7 -> "7"
-        | `V8 -> "8"
-        | `V9 -> "9"
-        | `Testing -> "testing"
-        | `Unstable -> "unstable"
-        | `Stable -> assert false in
-      apt_opam2 ?labels ~distro:"debian" ~tag ()
-    | `Ubuntu v ->
-      let tag = match v with
-        | `V12_04 -> "precise"
-        | `V14_04 -> "trusty"
-        | `V16_04 -> "xenial"
-        | `V16_10 -> "yakkety"
-        | `V17_04 -> "zesty"
-        | `V17_10 -> "artful"
-        | _ -> assert false in
-      apt_opam2 ?labels ~distro:"ubuntu" ~tag ()
-   | `CentOS v ->
-      let tag = match v with
-        | `V6 -> "6"
-        | `V7 -> "7"
-        | _ -> assert false in
-      yum_opam2 ?labels ~distro:"centos" ~tag ()
-   | `Fedora v ->
-      let tag = match v with
-        | `V21 -> "21" | `V22 -> "22" | `V23 -> "23" | `V24 -> "24"
-        | `V25 -> "25" | `V26 -> "26"
-        | _ -> assert false in
-      yum_opam2 ?labels ~distro:"fedora" ~tag ()
-   | `OracleLinux v ->
-      let tag = match v with
-        | `V7 -> "7" 
-        | _ -> assert false in
-      yum_opam2 ?labels ~distro:"oraclelinux" ~tag ()
-   | `OpenSUSE v ->
-      let tag = match v with
-        | `V42_1 -> "42.1"  | `V42_2 -> "42.2" | `V42_3 -> "42.3"
-        | _ -> assert false in
-      zypper_opam2 ?labels ~distro:"opensuse" ~tag ()
-   in (D.tag_of_distro d), fn
-
    let multiarch_manifest ~target ~platforms =
      let ms =
        List.map (fun (image, arch) ->
@@ -266,7 +140,7 @@ module Phases = struct
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
     let tag = Fmt.strf "%s:{}-opam-linux-%s" staging_hub_id arch_s in
     List.filter (D.distro_supported_on arch) D.active_distros |>
-    List.map Gen.gen_opam_for_distro |> fun ds ->
+    List.map O.gen_opam2_distro |> fun ds ->
     G.generate_dockerfiles ~crunch:true build_dir ds >>= fun () ->
     if_opt build @@ fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
