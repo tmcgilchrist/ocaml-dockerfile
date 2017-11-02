@@ -10,9 +10,6 @@ let arch_to_docker = function
  | `X86_64 -> "amd64"
  | `Aarch64 -> "arm64"
 
-let tag_of_ocaml_version ov =
-  Ocaml_version.to_string ov |> String.map (function '+' -> '-' | x -> x) 
-
 module Log_gen = struct
 
   let phases = [ "phase1-arm64"; "phase1-amd64"; "phase2" ]
@@ -36,52 +33,8 @@ end
 
 module Gen = struct
   open Dockerfile
-  open Dockerfile_opam
-  (* Generate archive mirror *)
-  let opam2_mirror (hub_id:string) =
-    header hub_id "alpine-3.6-opam" @@
-    run "sudo apk add --update bash m4" @@
-    workdir "/home/opam/opam-repository" @@
-    run "git pull origin master" @@
-    run "opam admin upgrade" @@
-    run "opam init -a /home/opam/opam-repository" @@
-    run "opam install -yj4 cohttp-lwt-unix" @@
-    run "opam admin cache"
-
-  let all_ocaml_compilers hub_id arch distro =
-    let distro = D.tag_of_distro distro in
-    let compilers =
-      OV.Releases.recent_major |>
-      List.filter (OV.Has.arch arch) |>
-      List.map OV.Opam.default_switch |>
-      List.map (run "opam switch create %s") |> (@@@) empty in
-    let d = 
-      header hub_id (Fmt.strf "%s-opam" distro) @@
-      run "cd /home/opam/opam-repository && git pull origin master" @@
-      run "opam init -a /home/opam/opam-repository" @@
-      compilers @@
-      run "opam switch default" in
-    (Fmt.strf "%s-ocaml" distro), d
-
-  let separate_ocaml_compilers hub_id arch distro =
-    let distro = D.tag_of_distro distro in
-    OV.Releases.recent_major_and_dev |> List.filter (OV.Has.arch arch) |>
-    List.map (fun ov ->
-      let default_switch = OV.Opam.default_switch ov in
-      let variants =
-        List.map (run "opam switch create %s") (OV.Opam.variants ov) |> (@@@) empty in
-      let d = 
-        header hub_id (Fmt.strf "%s-opam" distro) @@
-        run "cd /home/opam/opam-repository && git pull origin master" @@
-        run "opam init -a /home/opam/opam-repository -c %s" default_switch @@
-        variants @@
-        run "opam switch %s" default_switch
-      in
-      (Fmt.strf "%s-ocaml-%s" distro (tag_of_ocaml_version ov)), d
-    )
-
   let bulk_build distro arch prod_hub_id distro ocaml_version variant opam_repo_tag =
-    header prod_hub_id (Fmt.strf "%s-ocaml-%s" (D.tag_of_distro distro) ocaml_version) @@
+    O.header prod_hub_id (Fmt.strf "%s-ocaml-%s" (D.tag_of_distro distro) ocaml_version) @@
     (* TODO do opam_repo_tag once we have a v2 opam-repo branch so we can pull *)
     (match variant with Some v -> run "opam switch %s+%s" ocaml_version v| None -> empty) @@
     env ["OPAMYES","1"; "OPAMVERBOSE","1"; "OPAMJOBS","2"] @@
@@ -177,7 +130,7 @@ module Phases = struct
   (* Generate an opam archive suitable for pointing local builds at *)
   let phase3_archive {cache;push;build;staging_hub_id;prod_hub_id;build_dir;logs_dir} () =
     setup_log_dirs ~prefix:"phase3-archive" build_dir logs_dir @@ fun build_dir md ->
-    G.generate_dockerfile ~crunch:true build_dir (Gen.opam2_mirror prod_hub_id) >>= fun () ->
+    G.generate_dockerfile ~crunch:true build_dir (O.opam2_mirror prod_hub_id) >>= fun () ->
     if_opt build @@ fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile") in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag:"{}" (Fpath.v ".") in
@@ -193,10 +146,10 @@ module Phases = struct
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
     let all_compilers =
       List.filter (D.distro_supported_on arch) D.active_distros |>
-      List.map (Gen.all_ocaml_compilers prod_hub_id arch) in
+      List.map (O.all_ocaml_compilers prod_hub_id arch) in
     let each_compiler =
       List.filter (D.distro_supported_on arch) D.active_distros |>
-      List.map (Gen.separate_ocaml_compilers prod_hub_id arch) |>
+      List.map (O.separate_ocaml_compilers prod_hub_id arch) |>
       List.flatten in
     let dfiles = all_compilers @ each_compiler in
     G.generate_dockerfiles ~crunch:true build_dir dfiles >>= fun () ->

@@ -21,13 +21,14 @@ open Dockerfile
 open Printf
 module Linux = Dockerfile_linux
 module D = Dockerfile_distro
+module OV = Ocaml_version
 
 let run_as_opam fmt = Linux.run_as_user "opam" fmt
 
 let opamhome = "/home/opam"
 
 let install_opam_from_source ?(prefix= "/usr/local") ?(install_wrappers= false)
-    ?(branch= "1.2") () =
+    ?(branch= "master") () =
   let wrappers_dir = Filename.concat prefix "share/opam" in
   let inst name =
     Printf.sprintf
@@ -204,4 +205,51 @@ let gen_opam2_distro ?labels d =
         zypper_opam2 ?labels ~distro:"opensuse" ~tag ()
   in
   (D.tag_of_distro d, fn)
+
+
+(* Generate archive mirror *)
+let opam2_mirror (hub_id: string) =
+  header hub_id "alpine-3.6-opam" @@ run "sudo apk add --update bash m4"
+  @@ workdir "/home/opam/opam-repository" @@ run "git pull origin master"
+  @@ run "opam admin upgrade" @@ run "opam init -a /home/opam/opam-repository"
+  @@ run "opam install -yj4 cohttp-lwt-unix" @@ run "opam admin cache"
+
+
+let tag_of_ocaml_version ov =
+  Ocaml_version.to_string ov |> String.map (function '+' -> '-' | x -> x)
+
+
+let all_ocaml_compilers hub_id arch distro =
+  let distro = D.tag_of_distro distro in
+  let compilers =
+    OV.Releases.recent_major |> List.filter (OV.Has.arch arch)
+    |> List.map OV.Opam.default_switch
+    |> List.map (run "opam switch create %s") |> ( @@@ ) empty
+  in
+  let d =
+    header hub_id (Fmt.strf "%s-opam" distro)
+    @@ run "cd /home/opam/opam-repository && git pull origin master"
+    @@ run "opam init -a /home/opam/opam-repository" @@ compilers
+    @@ run "opam switch default"
+  in
+  (Fmt.strf "%s-ocaml" distro, d)
+
+
+let separate_ocaml_compilers hub_id arch distro =
+  let distro = D.tag_of_distro distro in
+  OV.Releases.recent_major_and_dev |> List.filter (OV.Has.arch arch)
+  |> List.map (fun ov ->
+         let default_switch = OV.Opam.default_switch ov in
+         let variants =
+           List.map (run "opam switch create %s") (OV.Opam.variants ov)
+           |> ( @@@ ) empty
+         in
+         let d =
+           header hub_id (Fmt.strf "%s-opam" distro)
+           @@ run "cd /home/opam/opam-repository && git pull origin master"
+           @@ run "opam init -a /home/opam/opam-repository -c %s"
+                default_switch
+           @@ variants @@ run "opam switch %s" default_switch
+         in
+         (Fmt.strf "%s-ocaml-%s" distro (tag_of_ocaml_version ov), d) )
 
