@@ -251,7 +251,7 @@ module Phases = struct
     let arch_s = arch_to_docker arch in 
     (* TODO pass through arch in prefix and cmdline *)
     let ov = Ocaml_version.to_string ov in
-    let opts = ["--ocaml-version"; ov ] @ (match variant with None -> [] |Some v -> ["--ocaml-variant"; v]) in
+    let opts = ["--distro"; D.tag_of_distro distro; "--ocaml-version"; ov ] @ (match variant with None -> [] |Some v -> ["--ocaml-variant"; v]) in
     let opam_repo_tag = "master" in
     let tag_frag = Fmt.strf "%s-%s%s-%s-%s" (D.tag_of_distro distro) ov (match variant with None -> "" |Some v -> "-"^v) opam_repo_tag arch_s in
     let prefix = Fmt.strf "phase5-%s" tag_frag in
