@@ -68,8 +68,8 @@ let distro_status (d:t) : status = match d with
   | `Fedora `Latest -> `Alias (`Fedora `V26)
   | `OracleLinux `V7 -> `Active
   | `OracleLinux `Latest -> `Alias (`OracleLinux `V7)
-  | `OpenSUSE `V42_1 -> `Deprecated
-  | `OpenSUSE `V42_2 | `OpenSUSE `V42_3 -> `Active
+  | `OpenSUSE `V42_1 | `OpenSUSE `V42_2 -> `Deprecated
+  | `OpenSUSE `V42_3 -> `Active
   | `OpenSUSE `Latest -> `Alias (`OpenSUSE `V42_3)
   | `Ubuntu ( `V12_04 | `V14_04 | `V16_04 | `V17_10 ) -> `Active
   | `Ubuntu ( `V15_04 | `V15_10 | `V16_10 | `V17_04 ) -> `Deprecated
