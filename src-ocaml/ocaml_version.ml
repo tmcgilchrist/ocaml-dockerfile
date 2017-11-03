@@ -53,22 +53,24 @@ module Releases = struct
   let v4_04_1 = of_string "4.04.1"
   let v4_04_2 = of_string "4.04.2"
   let v4_05_0 = of_string "4.05.0"
+  let v4_06_0 = of_string "4.06.0"
 
   let all = [
     v4_00_1;
     v4_01_0; v4_02_0; v4_02_1; v4_02_2; v4_02_3;
-    v4_03_0; v4_04_0; v4_04_1; v4_04_2; v4_05_0
+    v4_03_0; v4_04_0; v4_04_1; v4_04_2; v4_05_0;
+    v4_06_0
   ]
 
-  let all_major = [ v4_00_1; v4_01_0; v4_02_3; v4_03_0; v4_04_2; v4_05_0 ]
+  let all_major = [ v4_00_1; v4_01_0; v4_02_3; v4_03_0; v4_04_2; v4_05_0; v4_06_0 ]
 
-  let recent_major = [ v4_02_3; v4_03_0; v4_04_2; v4_05_0 ]
+  let recent_major = [ v4_03_0; v4_04_2; v4_05_0; v4_06_0 ]
 
-  let dev = [ of_string "4.06.0"; of_string "4.07.0" ]
+  let dev = [ of_string "4.07.0" ]
 
   let recent_major_and_dev = List.concat [recent_major;dev]
 
-  let latest_major = v4_05_0
+  let latest_major = v4_06_0
 end
 
 type arch = [`X86_64 | `Aarch64 ]
