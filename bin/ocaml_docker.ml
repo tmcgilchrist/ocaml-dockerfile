@@ -5,6 +5,7 @@ module C = Dockerfile_cmd
 module G = Dockerfile_gen
 module O = Dockerfile_opam
 module OV = Ocaml_version
+open Bos
 
 let arch_to_docker = function
  | `X86_64 -> "amd64"
@@ -226,14 +227,10 @@ module Phases = struct
     C.Mdlog.run_parallel ~retries:1 md "02-push" cmd [tag]
 
   let phase5_setup {staging_hub_id} () =
-    let open Bos in 
-    let cmd = Cmd.(v "docker" % "volume" % "rm" % "-f" % "opam2-archive") in
-    OS.Cmd.(run cmd) >>= fun () ->
+    Cmd.(C.Docker.volume_cmd % "rm" % "-f" % "opam2-archive") |> OS.Cmd.run >>= fun () ->
     (* TODO docker pull archive *)
-    let cmd = Cmd.(v "docker" % "run" % "--rm" % "--name=create-opam2-archive" % "--mount" %
-      "source=opam2-archive,destination=/home/opam/opam-repository/cache" %
-      Fmt.strf "%s:opam2-archive" staging_hub_id % "true") in
-    OS.Cmd.(run cmd)
+    C.Docker.run_cmd ~mounts:["opam2-archive","/home/opam/opam-repository/cache"] 
+      (Fmt.strf "%s:opam2-archive" staging_hub_id) (Cmd.v "true") |> OS.Cmd.run
   
   let phase5_build {arch;cache;staging_hub_id;prod_hub_id;build;build_dir;logs_dir} {distro;ov;variant} pkg () =
     let arch_s = arch_to_docker arch in 
@@ -241,10 +238,9 @@ module Phases = struct
     let opam_repo_tag = "master" in (* TODO add variant to tag frag *)
     let tag_frag = Fmt.strf "%s-%s%s-%s-%s" (D.tag_of_distro distro) ov (match variant with None -> "" |Some v -> "-"^v) opam_repo_tag arch_s in
     let prefix = Fmt.strf "phase5-%s" tag_frag in
-    let open Bos in 
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
     let img = Fmt.strf "%s:base-linux-%s" staging_hub_id tag_frag in
-    Cmd.(v "docker" % "run" % "--rm" % "-v" % "opam2-archive:/home/opam/.opam/download-cache" % img % "opam" % "depext" % "-i" % pkg) |>
+    C.Docker.run_cmd ~volumes:["opam2-archive","/home/opam/.opam/download-cache"] img (Cmd.(v "opam" % "depext" % "-i" % pkg)) |>
     C.Mdlog.run_cmd md pkg
 
   let phase5_cluster {arch;build_dir;logs_dir} {distro;ov;variant} hosts () =
@@ -255,14 +251,13 @@ module Phases = struct
     let opam_repo_tag = "master" in
     let tag_frag = Fmt.strf "%s-%s%s-%s-%s" (D.tag_of_distro distro) ov (match variant with None -> "" |Some v -> "-"^v) opam_repo_tag arch_s in
     let prefix = Fmt.strf "phase5-%s" tag_frag in
-    let open Bos in 
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
-    let hosts_l = String.concat "," hosts in
     Bos.OS.File.read_lines Fpath.(build_dir / "pkgs.txt") >>= fun pkgs ->
-    let joblog_f = Fpath.(logs_dir / "bulk-joblog.txt") in
-    Cmd.(v "parallel" % "--controlmaster" % "--timeout" % "300" % "--progress" % "--joblog" % p joblog_f % "--no-notice" % "-S" % hosts_l % "./ocaml-docker" % "phase5-build" %% of_list opts % "{}" % "-vvv" % ":::" %% of_list pkgs) |> OS.Cmd.run_status >>= fun _ ->
-    Cmd.(v "parallel" % "--no-notice" % "rsync" % "-av" % "{}:_logs" % "." % ":::" %% of_list hosts) |> OS.Cmd.run >>= fun () ->
-    Ok ()
+    let mode = `Remote hosts in
+    let cmd = Cmd.(v "./ocaml-docker" % "phase5-build" %% of_list opts % "-vv" % "{}") in
+    C.Mdlog.run_parallel ~mode ~retries:1 ~delay:1.0 md "cluster" cmd pkgs >>= fun () ->
+    let cmd = Cmd.(v "rsync" % "-avz" % "{}:_logs" % ".") in
+    C.Mdlog.run_parallel ~mode ~retries:1 md "logs" cmd hosts
 end
 
 open Cmdliner

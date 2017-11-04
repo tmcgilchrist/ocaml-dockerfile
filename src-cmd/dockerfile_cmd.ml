@@ -10,18 +10,25 @@ let rec iter fn l =
   | hd::tl -> fn hd >>= fun () -> iter fn tl
   | [] -> Ok ()
 
+type cmd_log = {
+  command: string;
+  stdout: string;
+  success: bool;
+  status: [ `Signaled of int | `Exited of int ]
+} [@@deriving sexp]
+
 let run_log ?env log_dir name cmd =
-  OS.File.write Fpath.(log_dir / (name ^ ".cmd")) (Cmd.to_string cmd) >>= fun () ->
-  let err = OS.Cmd.err_file Fpath.(log_dir / (name ^ ".err")) in
-  OS.Cmd.run_out ?env ~err cmd |>
-  OS.Cmd.out_file Fpath.(log_dir / (name ^ ".out")) >>= fun ((), (_,status)) ->
-  let write_exit code = 
-   OS.File.write Fpath.(log_dir / (name ^ ".exitcode")) (string_of_int code) in
+  let command = Cmd.to_string cmd in
+  OS.Cmd.(run_out ?env ~err:err_run_out) cmd |>
+  OS.Cmd.out_string >>= fun (stdout, (_,status)) ->
+  let success = status = `Exited 0 in
+  let cmd_log = { command; stdout; success; status } in
+  let path = Fpath.(log_dir / (name ^ ".sxp")) in
+  OS.File.write path (Sexplib.Sexp.to_string_hum (sexp_of_cmd_log cmd_log)) >>= fun () ->
   match status with
-  |`Signaled n ->
-     R.error_msg (Fmt.strf "Signal %d" n)
-  |`Exited 0 -> write_exit 0 >>= fun () -> Ok ()
-  |`Exited code -> write_exit code >>= fun () -> R.error_msg (Fmt.strf "exit code %d" code)
+  |`Signaled n -> R.error_msg (Fmt.strf "Signal %d" n)
+  |`Exited 0 -> Ok ()
+  |`Exited code -> R.error_msg (Fmt.strf "Exit code %d" code)
 
 (** Docker *)
 module Docker = struct
@@ -42,6 +49,9 @@ module Docker = struct
     let dfile = match dockerfile with None -> empty | Some d -> v "-f" % p d in
     let tag = match tag with None -> empty | Some t -> v "-t" % t in
     bin % "build" %% tag %% cache %% pull %% squash %% dfile  % p path
+
+  let volume_cmd =
+    Cmd.(bin % "volume")
 
   let push_cmd tag =
     Cmd.(bin % "push" % tag)
@@ -71,8 +81,12 @@ module Docker = struct
   let manifest_push_file file =
      Cmd.(v "manifest-tool" % "push" % "from-spec" % p file)
 
-  let run_cmd img cmd =
-    Cmd.(bin % "run" % img %% cmd)
+  let run_cmd ?(mounts=[]) ?(volumes=[]) ?(rm=true) img cmd =
+    let rm = if rm then Cmd.(v "--rm") else Cmd.empty in
+    let mounts = List.map (fun (src,dst) -> ["--mount"; Fmt.strf "source=%s,destination=%s" src dst]) mounts |> List.flatten |> Cmd.of_list in
+    let vols =
+     List.map (fun (src,dst) -> ["-v"; Fmt.strf "%s:%s" src dst]) volumes |> List.flatten |> Cmd.of_list in
+    Cmd.(bin % "run" %% rm %% mounts %% vols % img %% cmd)
 end
 
 (** Gnu Parallel *)
@@ -119,8 +133,11 @@ module Parallel = struct
   type t = joblog list [@@deriving sexp]
   let bin = Cmd.(v "parallel")
 
-  let run_cmd ?(joblog="joblog.txt") ?delay ?retries ?results cmd args =
+  let run_cmd ?(mode=`Local) ?(joblog="joblog.txt") ?delay ?retries ?results cmd args =
     let open Cmd in
+    let mode = match mode with
+     | `Local -> empty
+     | `Remote hosts -> v "--controlmaster" % "--timeout" % "300" % "-S" % String.concat ~sep:"," hosts in
     let args = of_list args in
     let retries =
       match retries with
@@ -138,12 +155,12 @@ module Parallel = struct
       match results with
       | None -> empty
       | Some r -> v "--results" % p r in
-    bin % "--no-notice" %% retries %% joblog %% delay %% results %% cmd % ":::" %% args
+    bin % "--no-notice" %% mode %% retries %% joblog %% delay %% results %% cmd % ":::" %% args
 
-  let run ?delay ?retries logs_dir label cmd args =
+  let run ?mode ?delay ?retries logs_dir label cmd args =
     let results = Some logs_dir in
     let joblog = Fmt.strf "%s-joblog.txt" label in
-    let t = run_cmd ~joblog ?delay ?retries ?results cmd args in
+    let t = run_cmd ?mode ?delay ?retries ?results ~joblog cmd args in
     run_log logs_dir label t >>= fun _ ->
     match results with
     | None -> R.ok []
@@ -196,10 +213,10 @@ module Mdlog = struct
   let init ~logs_dir ~prefix ~descr =
     { cmds=[]; logs_dir; prefix; descr }
 
-  let run_parallel ?retries ?delay t label cmd args =
+  let run_parallel ?mode ?retries ?delay t label cmd args =
     (* TODO still log on failure *)
     let logs_dir = Fpath.(t.logs_dir) in
-    Parallel.run ?retries ?delay logs_dir label cmd args >>= fun jobs ->
+    Parallel.run ?mode ?retries ?delay logs_dir label cmd args >>= fun jobs ->
     t.cmds <- {label; args} :: t.cmds;
     Ok ()
 
