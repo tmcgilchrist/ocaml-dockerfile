@@ -253,9 +253,10 @@ module Phases = struct
     let prefix = Fmt.strf "phase5-%s" tag_frag in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
     Bos.OS.File.read_lines Fpath.(build_dir / "pkgs.txt") >>= fun pkgs ->
-    let mode = `Remote hosts in
+    let mode = `Remote (`Controlmaster, hosts) in
     let cmd = Cmd.(v "./ocaml-docker" % "phase5-build" %% of_list opts % "-vv" % "{}") in
     C.Mdlog.run_parallel ~mode ~retries:1 md "03-cluster" cmd pkgs |> fun _ ->
+    let mode = `Remote (`Ssh, hosts) in
     let cmd = Cmd.(v "rsync" % "-avz" % "{}:_logs" % ".") in
     C.Mdlog.run_parallel ~mode ~retries:1 md "04-logs" cmd hosts
 end

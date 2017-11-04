@@ -137,7 +137,9 @@ module Parallel = struct
     let open Cmd in
     let mode = match mode with
      | `Local -> empty
-     | `Remote hosts -> v "--controlmaster" % "--timeout" % "300" % "-S" % String.concat ~sep:"," hosts in
+     | `Remote (mmode, hosts) ->
+       v "--timeout" % "300" % "-S" % String.concat ~sep:"," hosts %%
+       (match mmode with `Controlmaster -> v "--controlmaster" | `Ssh -> empty) in
     let args = of_list args in
     let retries =
       match retries with
