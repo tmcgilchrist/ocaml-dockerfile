@@ -255,9 +255,9 @@ module Phases = struct
     Bos.OS.File.read_lines Fpath.(build_dir / "pkgs.txt") >>= fun pkgs ->
     let mode = `Remote hosts in
     let cmd = Cmd.(v "./ocaml-docker" % "phase5-build" %% of_list opts % "-vv" % "{}") in
-    C.Mdlog.run_parallel ~mode ~retries:1 ~delay:1.0 md "cluster" cmd pkgs >>= fun () ->
+    C.Mdlog.run_parallel ~mode ~retries:1 md "03-cluster" cmd pkgs >>= fun () ->
     let cmd = Cmd.(v "rsync" % "-avz" % "{}:_logs" % ".") in
-    C.Mdlog.run_parallel ~mode ~retries:1 md "logs" cmd hosts
+    C.Mdlog.run_parallel ~mode ~retries:1 md "04-logs" cmd hosts
 end
 
 open Cmdliner

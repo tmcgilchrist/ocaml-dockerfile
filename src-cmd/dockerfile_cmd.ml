@@ -17,7 +17,7 @@ type cmd_log = {
   status: [ `Signaled of int | `Exited of int ]
 } [@@deriving sexp]
 
-let run_log ?env log_dir name cmd =
+let run_log ?(ok_to_fail=true) ?env log_dir name cmd =
   let command = Cmd.to_string cmd in
   OS.Cmd.(run_out ?env ~err:err_run_out) cmd |>
   OS.Cmd.out_string >>= fun (stdout, (_,status)) ->
@@ -26,9 +26,9 @@ let run_log ?env log_dir name cmd =
   let path = Fpath.(log_dir / (name ^ ".sxp")) in
   OS.File.write path (Sexplib.Sexp.to_string_hum (sexp_of_cmd_log cmd_log)) >>= fun () ->
   match status with
-  |`Signaled n -> R.error_msg (Fmt.strf "Signal %d" n)
+  |`Signaled n -> if ok_to_fail then Ok () else R.error_msg (Fmt.strf "Signal %d" n)
   |`Exited 0 -> Ok ()
-  |`Exited code -> R.error_msg (Fmt.strf "Exit code %d" code)
+  |`Exited code -> if ok_to_fail then Ok () else R.error_msg (Fmt.strf "Exit code %d" code)
 
 (** Docker *)
 module Docker = struct
