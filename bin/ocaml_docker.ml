@@ -61,11 +61,16 @@ end
 
 module Gen = struct
   open Dockerfile
-  let bulk_build distro arch prod_hub_id distro ocaml_version variant opam_repo_tag =
+  let bulk_build distro arch prod_hub_id distro ocaml_version variant () =
     O.header prod_hub_id (Fmt.strf "%s-ocaml-%s" (D.tag_of_distro distro) ocaml_version) @@
     (* TODO do opam_repo_tag once we have a v2 opam-repo branch so we can pull *)
     (match variant with Some v -> run "opam switch %s+%s" ocaml_version v| None -> empty) @@
     env ["OPAMYES","1"; "OPAMVERBOSE","1"; "OPAMJOBS","2"] @@
+    (* TODO This is temporary until we can pull from a 2.0 branch *)
+    run "rm -rf /home/opam/opam-repository" @@
+    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
+    run "cd /home/opam/opam-repository && git rev-parse HEAD --short > /home/opam/opam-repo-rev" @@
+    run "cd /home/opam/opam-repository && opam admin upgrade && opam update -u" @@
     run "opam pin add depext https://github.com/AltGr/opam-depext.git#opam-2-beta4" @@
     run "opam depext -uiy jbuilder ocamlfind"  |> fun dfile ->
     ["base", dfile]
@@ -228,25 +233,35 @@ module Phases = struct
     let args = List.map (fun (t,_) -> t) yamls in
     C.Mdlog.run_parallel ~delay:1.0 ~retries:1 md "01-manifest" cmd args
 
+  let bulk_results_dir ~opam_repo_rev ~arch ~ov ~variant ~distro logs_dir =
+     let variant = match variant with None -> "default" | Some v -> v in
+     D.tag_of_distro distro |> fun distro ->
+     arch_to_docker arch |> fun arch ->
+     Fpath.(logs_dir / "builds" / opam_repo_rev / arch / distro / ov / variant) 
+
   (* Setup a bulk build image *)
   let phase5 {arch;cache;staging_hub_id;prod_hub_id;build;push;build_dir;logs_dir} {distro;ov;variant} () =
     let arch_s = arch_to_docker arch in 
     let ov = Ocaml_version.to_string ov in
-    let opam_repo_tag = "master" in
-    let tag_frag = Fmt.strf "%s-%s%s-%s-%s" (D.tag_of_distro distro) ov (match variant with None -> "" |Some v -> "-"^v) opam_repo_tag arch_s in
+    let tag_frag = Fmt.strf "%s-%s%s-%s" (D.tag_of_distro distro) ov (match variant with None -> "" |Some v -> "-"^v) arch_s in
     let prefix = Fmt.strf "phase5-%s" tag_frag in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir md ->
-    let dfiles = Gen.bulk_build distro arch prod_hub_id distro ov variant opam_repo_tag in
-    G.generate_dockerfiles ~crunch:true build_dir dfiles >>= fun () ->
+    let dfiles = Gen.bulk_build distro arch prod_hub_id distro ov variant () in
+    G.generate_dockerfiles ~crunch:false build_dir dfiles >>= fun () ->
     if_opt build @@ fun () ->
     let dockerfile = Fpath.(build_dir / "Dockerfile.{}") in
     let tag = Fmt.strf "%s:base-linux-%s" staging_hub_id tag_frag in
     let cmd = C.Docker.build_cmd ~cache ~dockerfile ~tag (Fpath.v ".") in
     let args = List.map fst dfiles in
     C.Mdlog.run_parallel ~retries:1 md "01-build" cmd args >>= fun () ->
-    let opam_cmd = Bos.Cmd.of_list ["opam";"list";"--installable";"-s"] in 
-    let pkgs_list = Fpath.(build_dir / "pkgs.txt") in
-    Bos.OS.Cmd.(run_out (C.Docker.run_cmd tag opam_cmd) |> to_file pkgs_list) >>= fun () ->
+    let opam_rev_cmd = Cmd.of_list ["cat"; "/home/opam/opam-repo-rev"] in
+    OS.Cmd.(run_out (C.Docker.run_cmd tag opam_rev_cmd) |> to_string) >>= fun opam_repo_rev ->
+    print_endline opam_repo_rev;
+    let opam_cmd = Cmd.of_list ["opam";"list";"--installable";"-s"] in 
+    OS.Cmd.(run_out (C.Docker.run_cmd tag opam_cmd) |> to_string) >>= fun pkg_list ->
+    let res_dir = bulk_results_dir ~opam_repo_rev ~arch ~ov ~variant ~distro logs_dir in
+    OS.Dir.create res_dir >>= fun _ ->
+    OS.File.write Fpath.(res_dir / "pkgs.txt") pkg_list >>= fun () ->
     if_opt push @@ fun () ->
     let cmd = C.Docker.push_cmd "{}" in
     C.Mdlog.run_parallel ~retries:1 md "02-push" cmd [tag]
