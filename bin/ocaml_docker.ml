@@ -69,7 +69,7 @@ module Gen = struct
     (* TODO This is temporary until we can pull from a 2.0 branch *)
     run "rm -rf /home/opam/opam-repository" @@
     run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
-    run "cd /home/opam/opam-repository && git rev-parse HEAD --short > /home/opam/opam-repo-rev" @@
+    run "cd /home/opam/opam-repository && git rev-parse HEAD > /home/opam/opam-repo-rev" @@
     run "cd /home/opam/opam-repository && opam admin upgrade && opam update -u" @@
     run "opam pin add depext https://github.com/AltGr/opam-depext.git#opam-2-beta4" @@
     run "opam depext -uiy jbuilder ocamlfind"  |> fun dfile ->
