@@ -6,6 +6,8 @@ module G = Dockerfile_gen
 module O = Dockerfile_opam
 module OV = Ocaml_version
 open Bos
+open Rresult
+open R.Infix
 
 let arch_to_docker = function
  | `X86_64 -> "amd64"
@@ -30,6 +32,31 @@ module Log_gen = struct
       </div>
     " result j.command j.arg j.run_time
     )
+
+  let process_one ?variant ~arch ~ov ~distro logs_dir =
+    let fname =  Fmt.strf "phase5-%s-%s%s-%s-%s"
+     (D.tag_of_distro distro) (OV.to_string ov)
+     (match variant with None -> "" | Some v -> "-"^v)
+     "master" (arch_to_docker arch) in
+    let d = Fpath.(logs_dir / fname) in
+    OS.Dir.exists d >>= function
+    | false -> Ok ()
+    | true ->
+       Logs.info (fun l -> l "found %s" fname);
+       Ok ()
+
+  (* Look through the matrix of options we know about *)
+  let process logs_dir =
+    List.iter (fun distro ->
+      List.iter (fun ov ->
+        List.iter (fun arch ->
+          ignore(process_one ~arch ~ov ~distro logs_dir);
+          List.iter (fun variant ->
+            ignore(process_one ~variant ~arch ~ov ~distro logs_dir);
+          ) (OV.Opam.variants ov)
+        ) OV.arches
+      ) OV.Releases.recent_major_and_dev 
+    ) D.active_distros
 end
 
 module Gen = struct
@@ -73,8 +100,6 @@ type build_t = {
 
 module Phases = struct
 
-  open Rresult
-  open R.Infix
 
   let if_opt opt fn = if opt then fn () else Ok ()
 
@@ -256,12 +281,10 @@ module Phases = struct
     let mode = `Remote (`Controlmaster, hosts) in
     let cmd = Cmd.(v "./ocaml-docker" % "phase5-build" %% of_list opts % "-vv" % "{}") in
     C.Mdlog.run_parallel ~mode ~retries:1 md "03-cluster" cmd pkgs 
-(*
-|> fun _ ->
-    let mode = `Remote (`Ssh, hosts) in
-    let cmd = Cmd.(v "rsync" % "-avz" % "{}:_logs" % ".") in
-    C.Mdlog.run_parallel ~mode ~retries:1 md "04-logs" cmd hosts
-*)
+
+  let phase6_logs {logs_dir} () =
+    Log_gen.process logs_dir;
+    Ok ()
 end
 
 open Cmdliner
@@ -384,12 +407,18 @@ let phase5_cluster =
   Term.(term_result (const Phases.phase5_cluster $ copts_t $ build_t $ ssh_hosts $ setup_logs)),
   Term.info "phase5-cluster" ~doc ~exits
 
+let logs =
+  let doc = "process logs after build" in
+  let exits = Term.default_exits in
+  Term.(term_result (const Phases.phase6_logs $ copts_t $ setup_logs)),
+  Term.info "logs" ~doc ~exits
+
 let default_cmd =
   let doc = "build and push opam and OCaml multiarch container images" in
   let sdocs = Manpage.s_common_options in
   Term.(ret (const (fun _ -> `Help (`Pager, None)) $ pure ())),
   Term.info "obi-docker" ~version:"v1.0.0" ~doc ~sdocs
 
-let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_ocaml_cmd; phase4_cmd; phase5_cmd; phase5_build; phase5_setup; phase5_cluster]
+let cmds = [phase1_cmd; phase2_cmd; phase3_archive_cmd; phase3_ocaml_cmd; phase4_cmd; phase5_cmd; phase5_build; phase5_setup; phase5_cluster; logs]
 let () = Term.(exit @@ eval_choice default_cmd cmds)
 

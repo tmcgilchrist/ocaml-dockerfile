@@ -7,6 +7,7 @@ val sys_version : t
 val pp : Format.formatter -> t -> unit
 
 type arch = [ `X86_64 | `Aarch64 ]
+val arches : arch list
 
 module Releases : sig
   val v4_00_1 : t
@@ -43,5 +44,5 @@ module Opam : sig
   val variants : t -> string list
   val default_variant : t -> string option
   val default_switch : t -> string
-  val variants : t -> string list
+  val switches : t -> string list
 end

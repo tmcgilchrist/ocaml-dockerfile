@@ -74,6 +74,8 @@ module Releases = struct
 end
 
 type arch = [`X86_64 | `Aarch64 ]
+let arches = [ `X86_64; `Aarch64 ]
+
 module Since = struct
   let bytes = of_string "4.03.0"
   let arch (a:arch) =
@@ -118,7 +120,7 @@ module Opam = struct
   let default_switch t =
     to_string { t with extra = default_variant t }
 
-  let variants ov =
+  let switches ov =
     let default_variant = default_variant ov in
     variants ov |>
     List.filter (fun extra -> default_variant <> (Some extra)) |>
