@@ -228,8 +228,13 @@ let all_ocaml_compilers hub_id arch distro =
   in
   let d =
     header hub_id (Fmt.strf "%s-opam" distro)
-    @@ run "cd /home/opam/opam-repository && git pull origin master"
-    @@ run "opam init -a /home/opam/opam-repository" @@ compilers
+    @@ workdir "/home/opam/opam-repository"
+    @@ run "git pull origin master"
+    @@ run "git checkout -b v2"
+    @@ run "opam admin upgrade"
+    @@ run "git add ."
+    @@ run "git commit -m migrate -a"
+    @@ run "opam init -k git -a /home/opam/opam-repository" @@ compilers
     @@ run "opam switch default"
   in
   (Fmt.strf "%s-ocaml" distro, d)
@@ -252,7 +257,7 @@ let separate_ocaml_compilers hub_id arch distro =
            @@ run "opam admin upgrade"
            @@ run "git add ."
            @@ run "git commit -m migrate -a"
-           @@ run "opam init -a /home/opam/opam-repository -c %s"
+           @@ run "opam init -k git -a /home/opam/opam-repository -c %s"
                 default_switch
            @@ variants @@ run "opam switch %s" default_switch
          in
