@@ -67,10 +67,13 @@ module Gen = struct
     (match variant with Some v -> run "opam switch %s+%s" ocaml_version v| None -> empty) @@
     env ["OPAMYES","1"; "OPAMVERBOSE","1"; "OPAMJOBS","2"] @@
     (* TODO This is temporary until we can pull from a 2.0 branch *)
-    run "rm -rf /home/opam/opam-repository" @@
-    run "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository --depth 1" @@
-    run "cd /home/opam/opam-repository && git rev-parse HEAD > /home/opam/opam-repo-rev" @@
-    run "cd /home/opam/opam-repository && opam admin upgrade && opam update -u" @@
+    run "opam repo set-url default git+file:///home/opam/opam-repository" @@
+    run "git checkout master" @@
+    run "git pull origin master" @@
+    run "opam admin upgrade" @@
+    run "git checkout v2" @@
+    run "git add ." @@
+    run "git commit -m sync -a" @@
     run "opam pin add depext https://github.com/AltGr/opam-depext.git#opam-2-beta4" @@
     run "opam depext -uiy jbuilder ocamlfind"  |> fun dfile ->
     ["base", dfile]
