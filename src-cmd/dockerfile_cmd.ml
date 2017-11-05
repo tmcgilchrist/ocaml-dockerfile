@@ -160,22 +160,16 @@ module Parallel = struct
     bin % "--no-notice" %% mode %% retries %% joblog %% delay %% results %% cmd % ":::" %% args
 
   let run ?mode ?delay ?retries logs_dir label cmd args =
-    let results = Some logs_dir in
-    let joblog = Fmt.strf "%s-joblog.txt" label in
-    let t = run_cmd ?mode ?delay ?retries ?results ~joblog cmd args in
+    let results = Fpath.(logs_dir / label) in
+    OS.Dir.create ~path:true results >>= fun _ ->
+    let t = run_cmd ?mode ?delay ?retries ~results cmd args in
     run_log logs_dir label t >>= fun _ ->
-    match results with
-    | None -> R.ok []
-    | Some f ->
-       Joblog.v Fpath.(f / joblog) |>
-       List.map (fun j ->
-         let arg = List.nth args (j.Joblog.seq - 1) in
-         let build_logfiles =
-           match results with
-           | None -> None
-           | Some d ->
-               let path = Fmt.strf "%a/1/%s/" Fpath.pp d "TODO" in
-               Some (path ^ "stdout", path ^ "stderr") in
+    Joblog.v Fpath.(results / "joblog.txt") |>
+    List.map (fun j ->
+      let arg = List.nth args (j.Joblog.seq - 1) in
+      let build_logfiles =
+        let path = Fmt.strf "%a/1/%s/" Fpath.pp results "TODO" in
+        Some (path ^ "stdout", path ^ "stderr") in
          { j with arg; build_logfiles }) |> fun r ->
          let fails = List.filter (fun {Joblog.exit_code;_} -> exit_code <> 0) r in
          let is_ok = List.length fails = 0 in
