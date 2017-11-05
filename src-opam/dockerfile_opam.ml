@@ -241,12 +241,17 @@ let separate_ocaml_compilers hub_id arch distro =
   |> List.map (fun ov ->
          let default_switch = OV.Opam.default_switch ov in
          let variants =
-           List.map (run "opam switch create %s") (OV.Opam.variants ov)
+           List.map (run "opam switch create %s") (OV.Opam.switches ov)
            |> ( @@@ ) empty
          in
          let d =
            header hub_id (Fmt.strf "%s-opam" distro)
-           @@ run "cd /home/opam/opam-repository && git pull origin master"
+           @@ workdir "/home/opam/opam-repository"
+           @@ run "git pull origin master"
+           @@ run "git checkout -b v2"
+           @@ run "opam admin upgrade"
+           @@ run "git add ."
+           @@ run "git commit -m migrate -a"
            @@ run "opam init -a /home/opam/opam-repository -c %s"
                 default_switch
            @@ variants @@ run "opam switch %s" default_switch
