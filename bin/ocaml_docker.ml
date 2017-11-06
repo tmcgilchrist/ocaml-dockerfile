@@ -287,7 +287,7 @@ module Phases = struct
     C.Docker.run_cmd ~mounts:["opam2-archive","/home/opam/opam-repository/cache"] 
       (Fmt.strf "%s:opam2-archive" staging_hub_id) (Cmd.v "true") |> OS.Cmd.run
   
-  let phase5_build {arch;cache;staging_hub_id;prod_hub_id;build;build_dir;logs_dir;results_dir} {distro;ov} opam_repo_rev pkg () =
+  let phase5_build {arch;cache;staging_hub_id;prod_hub_id;build;build_dir;logs_dir;results_dir} {distro;ov} pkg opam_repo_rev () =
     let prefix = phase5_prefix ~distro ~ov ~arch ~opam_repo_rev in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir logs_dir ->
     let res_dir = bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro results_dir in
