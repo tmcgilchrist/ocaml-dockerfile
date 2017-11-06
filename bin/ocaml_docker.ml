@@ -302,7 +302,7 @@ module Phases = struct
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir logs_dir ->
     Bos.OS.File.read_lines Fpath.(build_dir / "pkgs.txt") >>= fun pkgs ->
     let mode = `Remote (`Controlmaster, hosts) in
-    let cmd = Cmd.(v "./ocaml-docker" % "phase5-build" %% of_list opts % "-vv" % "{}") in
+    let cmd = Cmd.(v "./ocaml-docker" % "phase5-build" %% of_list opts % "-vv" % "{}" % opam_repo_rev) in
     C.Parallel.run ~mode ~retries:1 logs_dir "03-cluster" cmd pkgs  >>= fun _ ->
     Ok ()
 
@@ -424,7 +424,7 @@ let phase5_build =
     Arg.(required & pos 0 (some string) None & info [] ~docv:"PACKAGE" ~doc) in
   let opam_repo_rev =
     let doc = "Opam repo revision" in
-    Arg.(required & pos 1 (some string) None & info [] ~docv:"OPAM_REPO_REV~" ~doc) in
+    Arg.(required & pos 1 (some string) None & info [] ~docv:"OPAM_REPO_REV" ~doc) in
   Term.(term_result (const Phases.phase5_build $ copts_t $ build_t $ pkg $ opam_repo_rev $ setup_logs)),
   Term.info "phase5-build" ~doc ~exits
 
