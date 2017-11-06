@@ -98,10 +98,11 @@ type copts = {
   arch: [`X86_64 | `Aarch64];
   build_dir: Fpath.t;
   logs_dir: Fpath.t;
+  results_dir: Fpath.t;
 }
 
-let copts staging_hub_id prod_hub_id push cache build arch build_dir logs_dir =
-  { staging_hub_id; prod_hub_id; push; cache; build; arch; build_dir; logs_dir }
+let copts staging_hub_id prod_hub_id push cache build arch build_dir logs_dir results_dir =
+  { staging_hub_id; prod_hub_id; push; cache; build; arch; build_dir; logs_dir; results_dir }
 
 type build_t = {
   ov: Ocaml_version.t;
@@ -254,7 +255,7 @@ module Phases = struct
     Fmt.strf "%s:%s" staging_hub_id (phase5_prefix ~distro ~ov ~arch ~opam_repo_rev)
 
   (* Setup a bulk build image *)
-  let phase5 {arch;cache;staging_hub_id;prod_hub_id;build;push;build_dir;logs_dir} {distro;ov} () =
+  let phase5 {arch;cache;staging_hub_id;prod_hub_id;build;push;build_dir;logs_dir;results_dir} {distro;ov} () =
     let prefix = phase5_prefix ~distro ~ov ~arch ~opam_repo_rev:"setup" in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir logs_dir ->
     let dfiles = Gen.bulk_build distro arch prod_hub_id distro ov () in
@@ -272,7 +273,7 @@ module Phases = struct
     OS.Cmd.(run (Cmd.(C.Docker.bin % "tag" % setup_tag % tag))) >>= fun () ->
     let opam_cmd = Cmd.of_list ["opam";"list";"--installable";"-s"] in 
     OS.Cmd.(run_out (C.Docker.run_cmd tag opam_cmd) |> to_string) >>= fun pkg_list ->
-    let res_dir = bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro logs_dir in
+    let res_dir = bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro results_dir in
     OS.Dir.create res_dir >>= fun _ ->
     OS.File.write Fpath.(res_dir / "pkgs.txt") pkg_list >>= fun () ->
     if_opt push @@ fun () ->
@@ -286,10 +287,10 @@ module Phases = struct
     C.Docker.run_cmd ~mounts:["opam2-archive","/home/opam/opam-repository/cache"] 
       (Fmt.strf "%s:opam2-archive" staging_hub_id) (Cmd.v "true") |> OS.Cmd.run
   
-  let phase5_build {arch;cache;staging_hub_id;prod_hub_id;build;build_dir;logs_dir} {distro;ov} opam_repo_rev pkg () =
+  let phase5_build {arch;cache;staging_hub_id;prod_hub_id;build;build_dir;logs_dir;results_dir} {distro;ov} opam_repo_rev pkg () =
     let prefix = phase5_prefix ~distro ~ov ~arch ~opam_repo_rev in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir logs_dir ->
-    let res_dir = bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro logs_dir in
+    let res_dir = bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro results_dir in
     let tag = phase5_tag ~staging_hub_id ~distro ~ov ~arch ~opam_repo_rev in
     C.Docker.run_cmd ~volumes:["opam2-archive","/home/opam/.opam/download-cache"] tag (Cmd.(v "opam" % "depext" % "-i" % pkg)) |>
     C.run_log res_dir pkg
@@ -343,7 +344,10 @@ let copts_t =
   let logs_dir =
     let doc = "Directory in which to store logs" in
     Arg.(value & opt fpath (Fpath.v "_logs") & info ["l";"logs-dir"] ~docv:"LOG_DIR" ~doc ~docs) in
-  Term.(const copts $ staging_hub_id $ prod_hub_id $ push $ cache $ build $ arch $ build_dir $ logs_dir)
+  let results_dir =
+    let doc = "Directory in which to store bulk build results" in
+    Arg.(value & opt fpath (Fpath.v "_results") & info ["o";"results-dir"] ~docv:"RESULTS_DIR" ~doc ~docs) in
+  Term.(const copts $ staging_hub_id $ prod_hub_id $ push $ cache $ build $ arch $ build_dir $ logs_dir $ results_dir)
 
 let phase1_cmd =
   let doc = "generate, build and push base opam container images" in
