@@ -71,6 +71,7 @@ module Gen = struct
     workdir "/home/opam/opam-repository" @@
     run "git checkout master" @@
     run "git pull origin master" @@
+    run "git rev-parse HEAD > /home/opam/opam-repo-rev" @@
     run "opam admin upgrade" @@
     run "git branch -D v2" @@
     run "git checkout -b v2" @@
