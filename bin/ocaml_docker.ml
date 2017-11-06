@@ -297,13 +297,13 @@ module Phases = struct
 
   let phase5_cluster {arch;build_dir;logs_dir;results_dir} {distro;ov} hosts opam_repo_rev () =
     (* TODO pass through arch in prefix and cmdline *)
-    let opts = ["--distro"; D.tag_of_distro distro; "--ocaml-version"; OV.to_string ov ] in
+    let opts = ["--distro"; D.tag_of_distro distro; "--ocaml-version"; OV.to_string ov; "--opam-repo-rev"; opam_repo_rev ] in
     let prefix = phase5_prefix ~distro ~ov ~arch ~opam_repo_rev in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir logs_dir ->
     let res_dir = bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro results_dir in
     Bos.OS.File.read_lines Fpath.(res_dir / "pkgs.txt") >>= fun pkgs ->
     let mode = `Remote (`Controlmaster, hosts) in
-    let cmd = Cmd.(v "./ocaml-docker" % "phase5-build" %% of_list opts % "-vv" % "{}" % opam_repo_rev) in
+    let cmd = Cmd.(v "./ocaml-docker" % "phase5-build" %% of_list opts % "-vv" % "{}") in
     C.Parallel.run ~mode ~retries:1 logs_dir "03-cluster" cmd pkgs  >>= fun _ ->
     Ok ()
 
@@ -404,6 +404,10 @@ let build_t =
     let doc = "distro to build" in
     Arg.(value & opt string "alpine-3.6" & info ["distro"] ~docv:"DISTRO" ~doc) in
   Term.(const buildv $ ocaml_version $ distro)
+
+let opam_repo_rev_t =
+  let doc = "opam repo git rev" in
+  Arg.(required & opt (some string) None & info ["opam-repo-rev"] ~docv:"OPAM_REPO_REV" ~doc)
  
 let phase5_cmd =
   let doc = "create a bulk build base image and generate a package list for it" in
@@ -423,19 +427,13 @@ let phase5_build =
   let pkg =
     let doc = "Package to build" in
     Arg.(required & pos 0 (some string) None & info [] ~docv:"PACKAGE" ~doc) in
-  let opam_repo_rev =
-    let doc = "Opam repo revision" in
-    Arg.(required & pos 1 (some string) None & info [] ~docv:"OPAM_REPO_REV" ~doc) in
-  Term.(term_result (const Phases.phase5_build $ copts_t $ build_t $ pkg $ opam_repo_rev $ setup_logs)),
+  Term.(term_result (const Phases.phase5_build $ copts_t $ build_t $ pkg $ opam_repo_rev_t $ setup_logs)),
   Term.info "phase5-build" ~doc ~exits
 
 let phase5_cluster =
   let doc = "run cluster build" in
   let exits = Term.default_exits in
-  let opam_repo_rev =
-    let doc = "Opam repo revision" in
-    Arg.(required & pos 0 (some string) None & info [] ~docv:"OPAM_REPO_REV" ~doc) in
-  Term.(term_result (const Phases.phase5_cluster $ copts_t $ build_t $ ssh_hosts $ opam_repo_rev $ setup_logs)),
+  Term.(term_result (const Phases.phase5_cluster $ copts_t $ build_t $ ssh_hosts $ opam_repo_rev_t $ setup_logs)),
   Term.info "phase5-cluster" ~doc ~exits
 
 let logs =
