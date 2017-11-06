@@ -297,7 +297,7 @@ module Phases = struct
 
   let phase5_cluster {arch;build_dir;logs_dir;results_dir} {distro;ov} hosts opam_repo_rev () =
     (* TODO pass through arch in prefix and cmdline *)
-    let opts = ["--results-dir"; results_dir; "--distro"; D.tag_of_distro distro; "--ocaml-version"; OV.to_string ov; "--opam-repo-rev"; opam_repo_rev ] in
+    let opts = ["--results-dir"; Fpath.to_string results_dir; "--distro"; D.tag_of_distro distro; "--ocaml-version"; OV.to_string ov; "--opam-repo-rev"; opam_repo_rev ] in
     let prefix = phase5_prefix ~distro ~ov ~arch ~opam_repo_rev in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir logs_dir ->
     let res_dir = bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro results_dir in
