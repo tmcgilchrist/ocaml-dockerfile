@@ -2,12 +2,12 @@ type t = { major: int; minor: int; patch: int option; extra: string option }
 
 let v ?patch ?extra major minor = { major; minor; patch; extra }
 
-let to_string =
+let to_string ?(sep='+') =
   function
   | {major;minor;patch=None;extra=None} -> Printf.sprintf "%d.%02d" major minor
   | {major;minor;patch=Some patch;extra=None} -> Printf.sprintf "%d.%02d.%d" major minor patch
-  | {major;minor;patch=Some patch;extra=Some extra} -> Printf.sprintf "%d.%02d.%d+%s" major minor patch extra
-  | {major;minor;patch=None;extra=Some extra} -> Printf.sprintf "%d.%02d+%s" major minor extra
+  | {major;minor;patch=Some patch;extra=Some extra} -> Printf.sprintf "%d.%02d.%d%c%s" major minor patch sep extra
+  | {major;minor;patch=None;extra=Some extra} -> Printf.sprintf "%d.%02d%c%s" major minor sep extra
 
 let parse s =
   try Scanf.sscanf s "%d.%d.%d+%s" (fun major minor patch extra -> v ~patch ~extra major minor)
@@ -40,6 +40,8 @@ let compare {major; minor; patch; extra} a =
         compare extra a.extra
 
 let sys_version = of_string Sys.ocaml_version
+
+let with_variant t extra = { t with extra }
 
 module Releases = struct
   let v4_00_1 = of_string "4.00.1"

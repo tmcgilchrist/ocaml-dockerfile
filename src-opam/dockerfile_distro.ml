@@ -56,7 +56,8 @@ let distro_status (d:t) : status = match d with
   | `Alpine ( `V3_3 | `V3_4 | `V3_5) -> `Deprecated
   | `Alpine `V3_6 -> `Active
   | `Alpine `Latest -> `Alias (`Alpine `V3_6)
-  | `CentOS ( `V6 | `V7 ) -> `Active
+  | `CentOS `V7 -> `Active
+  | `CentOS `V6 -> `Deprecated
   | `CentOS `Latest -> `Alias (`CentOS `V7)
   | `Debian `V7 -> `Deprecated
   | `Debian ( `V8 | `V9 ) -> `Active

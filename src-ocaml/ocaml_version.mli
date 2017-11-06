@@ -1,10 +1,12 @@
 type t
 val v : ?patch:int -> ?extra:string -> int -> int -> t
-val to_string : t -> string
+val to_string : ?sep:char -> t -> string
 val of_string : string -> t
 val compare : t -> t -> int
 val sys_version : t
 val pp : Format.formatter -> t -> unit
+
+val with_variant : t -> string option -> t
 
 type arch = [ `X86_64 | `Aarch64 ]
 val arches : arch list
