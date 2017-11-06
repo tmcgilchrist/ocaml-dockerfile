@@ -236,7 +236,7 @@ module Phases = struct
     if_opt push @@ fun () ->
     let cmd = C.Docker.manifest_push_file (yaml_file "{}") in
     let args = List.map (fun (t,_) -> t) yamls in
-    C.Parallel.run ~delay:1.0 ~retries:1 logs_dir "01-manifest" cmd args >>= fun _ ->
+    C.Parallel.run ~delay:0.1 ~retries:1 logs_dir "01-manifest" cmd args >>= fun _ ->
     Ok ()
 
   let bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro logs_dir =
