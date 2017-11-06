@@ -68,10 +68,12 @@ module Gen = struct
     run "opam switch %s" (OV.to_string ocaml_version) @@
     env ["OPAMYES","1"; "OPAMVERBOSE","1"; "OPAMJOBS","2"] @@
     (* TODO This is temporary until we can pull from a 2.0 branch *)
+    workdir "/home/opam/opam-repository" @@
     run "git checkout master" @@
     run "git pull origin master" @@
     run "opam admin upgrade" @@
-    run "git checkout v2" @@
+    run "git branch -D v2" @@
+    run "git checkout -b v2" @@
     run "git add ." @@
     run "git commit -m sync -a" @@
     run "opam pin add depext https://github.com/AltGr/opam-depext.git#opam-2-beta4" @@
