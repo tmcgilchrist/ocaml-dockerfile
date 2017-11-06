@@ -295,12 +295,13 @@ module Phases = struct
     C.Docker.run_cmd ~volumes:["opam2-archive","/home/opam/.opam/download-cache"] tag (Cmd.(v "opam" % "depext" % "-i" % pkg)) |>
     C.run_log res_dir pkg
 
-  let phase5_cluster {arch;build_dir;logs_dir} {distro;ov} hosts opam_repo_rev () =
+  let phase5_cluster {arch;build_dir;logs_dir;results_dir} {distro;ov} hosts opam_repo_rev () =
     (* TODO pass through arch in prefix and cmdline *)
     let opts = ["--distro"; D.tag_of_distro distro; "--ocaml-version"; OV.to_string ov ] in
     let prefix = phase5_prefix ~distro ~ov ~arch ~opam_repo_rev in
     setup_log_dirs ~prefix build_dir logs_dir @@ fun build_dir logs_dir ->
-    Bos.OS.File.read_lines Fpath.(build_dir / "pkgs.txt") >>= fun pkgs ->
+    let res_dir = bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro results_dir in
+    Bos.OS.File.read_lines Fpath.(res_dir / "pkgs.txt") >>= fun pkgs ->
     let mode = `Remote (`Controlmaster, hosts) in
     let cmd = Cmd.(v "./ocaml-docker" % "phase5-build" %% of_list opts % "-vv" % "{}" % opam_repo_rev) in
     C.Parallel.run ~mode ~retries:1 logs_dir "03-cluster" cmd pkgs  >>= fun _ ->
