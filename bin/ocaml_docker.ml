@@ -433,7 +433,7 @@ let phase5_cluster =
   let exits = Term.default_exits in
   let opam_repo_rev =
     let doc = "Opam repo revision" in
-    Arg.(required & pos 1 (some string) None & info [] ~docv:"OPAM_REPO_REV~" ~doc) in
+    Arg.(required & pos 0 (some string) None & info [] ~docv:"OPAM_REPO_REV" ~doc) in
   Term.(term_result (const Phases.phase5_cluster $ copts_t $ build_t $ ssh_hosts $ opam_repo_rev $ setup_logs)),
   Term.info "phase5-cluster" ~doc ~exits
 
