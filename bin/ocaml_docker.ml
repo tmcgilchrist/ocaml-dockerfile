@@ -246,7 +246,7 @@ module Phases = struct
      D.tag_of_distro distro |> fun distro ->
      arch_to_docker arch |> fun arch ->
      OV.to_string ~sep:'-' ov |> fun ov ->
-     Fpath.(logs_dir / "builds" / opam_repo_rev / arch / distro / ov) 
+     Fpath.(logs_dir / opam_repo_rev / arch / distro / ov) 
 
   let phase5_prefix ~distro ~ov ~arch ~opam_repo_rev =
     Fmt.strf "base-linux-%s-%s-%s-%s" (D.tag_of_distro distro) (OV.to_string ~sep:'-' ov) (arch_to_docker arch) opam_repo_rev
