@@ -120,11 +120,11 @@ module Opam = struct
     | _ -> None
 
   let default_switch t =
-    to_string { t with extra = default_variant t }
+    { t with extra = default_variant t }
 
-  let switches ov =
+  let variant_switches ov =
     let default_variant = default_variant ov in
     variants ov |>
     List.filter (fun extra -> default_variant <> (Some extra)) |>
-    List.map (fun extra -> to_string { ov with extra = Some extra })
+    List.map (fun extra -> { ov with extra = Some extra })
 end

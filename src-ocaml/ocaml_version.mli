@@ -45,6 +45,7 @@ end
 module Opam : sig
   val variants : t -> string list
   val default_variant : t -> string option
-  val default_switch : t -> string
-  val switches : t -> string list
+
+  val default_switch : t -> t
+  val variant_switches : t -> t list
 end

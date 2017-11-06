@@ -33,7 +33,7 @@ module Log_gen = struct
     " result j.command j.arg j.run_time
     )
 
-  let process_one ?variant ~arch ~ov ~distro logs_dir =
+  let process_one ?variant ~arch ~ov ~distro logs_dir hash =
     let fname =  Fmt.strf "phase5-%s-%s%s-%s-%s"
      (D.tag_of_distro distro) (OV.to_string ov)
      (match variant with None -> "" | Some v -> "-"^v)
@@ -46,13 +46,13 @@ module Log_gen = struct
        Ok ()
 
   (* Look through the matrix of options we know about *)
-  let process logs_dir =
+  let process logs_dir hash =
     List.iter (fun distro ->
       List.iter (fun ov ->
         List.iter (fun arch ->
-          ignore(process_one ~arch ~ov ~distro logs_dir);
+          ignore(process_one ~arch ~ov ~distro logs_dir hash);
           List.iter (fun variant ->
-            ignore(process_one ~variant ~arch ~ov ~distro logs_dir);
+            ignore(process_one ~variant ~arch ~ov ~distro logs_dir hash);
           ) (OV.Opam.variants ov)
         ) OV.arches
       ) OV.Releases.recent_major_and_dev 
@@ -307,8 +307,8 @@ module Phases = struct
     C.Parallel.run ~mode ~retries:1 logs_dir "03-cluster" cmd pkgs  >>= fun _ ->
     Ok ()
 
-  let phase6_logs {logs_dir} () =
-    Log_gen.process logs_dir;
+  let phase6_logs {results_dir} hash () =
+    Log_gen.process results_dir hash;
     Ok ()
 end
 
@@ -439,7 +439,7 @@ let phase5_cluster =
 let logs =
   let doc = "process logs after build" in
   let exits = Term.default_exits in
-  Term.(term_result (const Phases.phase6_logs $ copts_t $ setup_logs)),
+  Term.(term_result (const Phases.phase6_logs $ copts_t $ opam_repo_rev_t $ setup_logs)),
   Term.info "logs" ~doc ~exits
 
 let default_cmd =
