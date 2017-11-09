@@ -210,8 +210,8 @@ let gen_opam2_distro ?labels d =
 (* Generate archive mirror *)
 let opam2_mirror (hub_id: string) =
   header hub_id "alpine-3.6-ocaml-4.05.0" @@ run "sudo apk add --update bash m4"
-  @@ workdir "/home/opam/opam-repository" @@ run "git pull origin master"
-  @@ run "opam admin upgrade" @@ run "opam init -a /home/opam/opam-repository"
+  @@ workdir "/home/opam/opam-repository" @@ run "git checkout master" @@ run "git pull origin master"
+  @@ run "opam admin upgrade" @@ run "git add ." @@ run "git commit -m sync -a" @@ run "opam init -a /home/opam/opam-repository"
   @@ env ["OPAMJOBS","24"]
   @@ run "opam install -yj4 cohttp-lwt-unix" @@ run "opam admin cache"
 
