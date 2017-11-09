@@ -13,6 +13,15 @@ let arch_to_docker = function
  | `X86_64 -> "amd64"
  | `Aarch64 -> "arm64"
 
+let bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro logs_dir =
+  D.tag_of_distro distro |> fun distro ->
+  arch_to_docker arch |> fun arch ->
+  OV.to_string ~sep:'-' ov |> fun ov ->
+  Fpath.(logs_dir / opam_repo_rev / arch / distro / ov) 
+
+let if_opt opt fn = if opt then fn () else Ok ()
+let if_opt_m def opt fn = opt >>= function true -> fn () | false -> Ok def
+
 module Log_gen = struct
 
   let phases = [ "phase1-arm64"; "phase1-amd64"; "phase2" ]
@@ -33,30 +42,100 @@ module Log_gen = struct
     " result j.command j.arg j.run_time
     )
 
-  let process_one ?variant ~arch ~ov ~distro logs_dir hash =
-    let fname =  Fmt.strf "phase5-%s-%s%s-%s-%s"
-     (D.tag_of_distro distro) (OV.to_string ov)
-     (match variant with None -> "" | Some v -> "-"^v)
-     "master" (arch_to_docker arch) in
-    let d = Fpath.(logs_dir / fname) in
-    OS.Dir.exists d >>= function
-    | false -> Ok ()
-    | true ->
-       Logs.info (fun l -> l "found %s" fname);
-       Ok ()
+  module SM = Map.Make(String)
+
+  let process_one ~arch ~ov ~distro logs_dir hash =
+    let d = bulk_results_dir ~opam_repo_rev:hash ~arch ~ov ~distro logs_dir in
+    if_opt_m [] (OS.Dir.exists d) @@ fun () ->
+    OS.File.read_lines Fpath.(d / "pkgs.txt") >>= fun pkgs ->
+    Logs.info (fun l -> l "Processing %a (%d packages)" Fpath.pp d (List.length pkgs));
+    pkgs |>
+    List.map (fun pkg -> pkg, (Fpath.(d / (pkg ^ ".sxp")))) |>
+    List.filter (fun (pkg,p) -> OS.File.exists p = Ok true) |>
+    List.map (fun (pkg,p) -> pkg, (Sexplib.Sexp.load_sexp (Fpath.to_string p))) |>
+    List.map (fun (pkg,s) -> pkg, (C.cmd_log_of_sexp s)) |> fun r ->
+    Ok r
+
+let triage ext str_to_analyze =
+  let open Scry in
+  let p_status = Repo.(
+    match ext with
+    |`Signaled signal -> Signaled signal
+    |`Exited e -> Exited e) in
+  let r =
+    Repo.({ r_cmd = "opam"; r_args = []; r_env = [||]; r_cwd = "";
+            r_duration = Time.min;
+            r_stdout = str_to_analyze;
+            r_stderr = str_to_analyze }) in
+  let error = Result.error_of_exn (Repo.ProcessError (p_status, r)) in
+  let status = Result.(Failed (analyze_all error, error)) in
+  Result.string_of_status status
 
   (* Look through the matrix of options we know about *)
   let process logs_dir hash =
-    List.iter (fun distro ->
-      List.iter (fun ov ->
-        List.iter (fun arch ->
-          ignore(process_one ~arch ~ov ~distro logs_dir hash);
-          List.iter (fun variant ->
-            ignore(process_one ~variant ~arch ~ov ~distro logs_dir hash);
-          ) (OV.Opam.variants ov)
-        ) OV.arches
-      ) OV.Releases.recent_major_and_dev 
-    ) D.active_distros
+    process_one ~arch:`X86_64 ~ov:(OV.of_string "4.05.0") ~distro:(`Debian `V9) logs_dir hash >>= fun r1 ->
+    process_one ~arch:`X86_64 ~ov:(OV.of_string "4.06.0") ~distro:(`Debian `V9) logs_dir hash >>= fun r2 ->
+    List.partition (fun (_,r) -> r.C.success) r1 |> fun (ok1,fail1) ->
+    List.partition (fun (_,r) -> r.C.success) r2 |> fun (ok2,fail2) ->
+    Fmt.epr "4.05: (ok %d fail %d)\n" (List.length ok1) (List.length fail1);
+    Fmt.epr "4.06: (ok %d fail %d)\n" (List.length ok2) (List.length fail2);
+    let h = Hashtbl.create 1000 in
+    (* Populate base version *)
+    List.iter (fun (pkg,res) -> Hashtbl.add h pkg `Ok_fst) ok1;
+    List.iter (fun (pkg,res) -> Hashtbl.add h pkg (`Fail_fst res)) fail1;
+    List.iter (fun (pkg,res) ->
+      match Hashtbl.find h pkg with
+      | `Ok_fst -> Hashtbl.replace h pkg `Ok_both
+      | `Fail_fst res -> Hashtbl.replace h pkg (`Fixed_snd res)
+      | _ -> assert false
+      | exception Not_found -> Hashtbl.add h pkg `Ok_snd
+    ) ok2;
+    List.iter (fun (pkg,res) ->
+      match Hashtbl.find h pkg with
+      | `Ok_fst -> Hashtbl.replace h pkg (`Broken_snd res)
+      | `Fail_fst res' -> Hashtbl.replace h pkg (`Failed_both (res',res))
+      | _ -> assert false
+      | exception Not_found -> Hashtbl.add h pkg (`Failed_snd res)
+    ) fail2;
+    let to_string pkg = function
+    | `Ok_fst -> "ok -> ()"
+    | `Ok_both -> "ok"
+    | `Fail_fst _ -> Fmt.strf "[err](#%s-1) -> ()" pkg
+    | `Fixed_snd _ -> Fmt.strf "[err](#%s-1) -> ok" pkg
+    | `Broken_snd _ -> Fmt.strf "ok -> [err](#%s-2)" pkg
+    | `Ok_snd -> "() -> ok"
+    | `Failed_both _ -> Fmt.strf "[err](#%s-1) -> [err](#%s-2)" pkg pkg
+    | `Failed_snd _ -> Fmt.strf "() -> [err](#%s-2)" pkg
+    in
+    Fmt.pr "| Package | Build Status |\n";
+    Fmt.pr "| ------- | ------------ |\n";
+    Hashtbl.iter (fun pkg st ->
+      match st with
+      | `Ok_both | `Ok_fst | `Ok_snd -> ()
+      | `Fail_fst _ | `Fixed_snd _ | `Broken_snd _ | `Failed_both _ | `Failed_snd _ ->
+      Fmt.pr "| %s | %s | \n" pkg (to_string pkg st);
+    ) h;
+    Fmt.pr "\n# Build Logs\n\n";
+    let list_trim num lines =
+      let rec fn l acc = function
+        | _ when l = 0 -> acc
+        | hd::tl -> fn (l-1) (hd::acc) tl
+        | [] -> acc in
+      fn num [] (List.rev lines) in
+    let print_log l =
+      print_endline "```\n";
+      Astring.String.cuts ~sep:"\n" l |>
+      list_trim 50 |>
+      List.iter print_endline;
+      Fmt.pr "```\n\n" in
+    Hashtbl.iter (fun pkg st ->
+      match st with
+      | `Ok_both | `Ok_fst | `Ok_snd -> ()
+      | `Fail_fst res -> Fmt.pr "## %s-1\n\n" pkg; print_log res.C.stdout
+      | `Fixed_snd res | `Broken_snd res | `Failed_snd res -> Fmt.pr "## %s-2\n\n" pkg; print_log res.C.stdout
+      | `Failed_both (res1,res2) -> Fmt.pr "## %s-1\n\n" pkg; print_log res1.C.stdout; Fmt.pr "## %s-2\n\n" pkg; print_log res2.C.stdout
+    ) h;
+    Ok ()
 end
 
 module Gen = struct
@@ -111,8 +190,6 @@ type build_t = {
 
 module Phases = struct
 
-
-  let if_opt opt fn = if opt then fn () else Ok ()
 
   let setup_log_dirs ~prefix build_dir logs_dir fn =
     Fpath.(build_dir / prefix) |> fun build_dir ->
@@ -242,12 +319,6 @@ module Phases = struct
     C.Parallel.run ~delay:0.1 ~retries:1 logs_dir "01-manifest" cmd args >>= fun _ ->
     Ok ()
 
-  let bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro logs_dir =
-     D.tag_of_distro distro |> fun distro ->
-     arch_to_docker arch |> fun arch ->
-     OV.to_string ~sep:'-' ov |> fun ov ->
-     Fpath.(logs_dir / opam_repo_rev / arch / distro / ov) 
-
   let phase5_prefix ~distro ~ov ~arch ~opam_repo_rev =
     Fmt.strf "base-linux-%s-%s-%s-%s" (D.tag_of_distro distro) (OV.to_string ~sep:'-' ov) (arch_to_docker arch) opam_repo_rev
 
@@ -308,8 +379,7 @@ module Phases = struct
     Ok ()
 
   let phase6_logs {results_dir} hash () =
-    Log_gen.process results_dir hash;
-    Ok ()
+    Log_gen.process results_dir hash
 end
 
 open Cmdliner

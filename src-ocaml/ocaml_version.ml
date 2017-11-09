@@ -1,5 +1,4 @@
 type t = { major: int; minor: int; patch: int option; extra: string option }
-
 let v ?patch ?extra major minor = { major; minor; patch; extra }
 
 let to_string ?(sep='+') =
@@ -119,12 +118,16 @@ module Opam = struct
     | 4,3 -> None
     | _ -> None
 
+  let switches t =
+    match default_variant t with
+    | None -> { t with extra = None } :: (List.map (fun e -> { t with extra = Some e}) (variants t))
+    | Some _ -> List.map (fun e -> { t with extra = Some e }) (variants t)
+
   let default_switch t =
     { t with extra = default_variant t }
 
-  let variant_switches ov =
-    let default_variant = default_variant ov in
-    variants ov |>
-    List.filter (fun extra -> default_variant <> (Some extra)) |>
-    List.map (fun extra -> { ov with extra = Some extra })
+  let variant_switches t =
+    let default_variant = default_variant t in
+    switches t |>
+    List.filter (fun {extra} -> extra <> default_variant)
 end
