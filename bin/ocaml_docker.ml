@@ -342,7 +342,7 @@ module Phases = struct
     print_endline opam_repo_rev;
     let tag = phase5_tag ~staging_hub_id ~distro ~ov ~arch ~opam_repo_rev in
     OS.Cmd.(run (Cmd.(C.Docker.bin % "tag" % setup_tag % tag))) >>= fun () ->
-    let opam_cmd = Cmd.of_list ["opam";"list";"--installable";"-s"] in 
+    let opam_cmd = Cmd.of_list ["opam";"list";"--installable";"--all-versions"; "-s"] in 
     OS.Cmd.(run_out (C.Docker.run_cmd tag opam_cmd) |> to_string) >>= fun pkg_list ->
     let res_dir = bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro results_dir in
     OS.Dir.create res_dir >>= fun _ ->
