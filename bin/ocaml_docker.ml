@@ -63,16 +63,18 @@ module Log_gen = struct
     Result.string_of_status status
 
 
-  let html_results_table h ovs =
+  let html_results_table hash h ovs =
     let open Soup in
     let open Astring in
     let idx =
-      "\n<!doctype html>\n<html lang=\"en\">\n  <head>\n    <title class=\"template\"></title>\n    <meta charset=\"utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">\n    <link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css\" integrity=\"sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb\" crossorigin=\"anonymous\">\n  </head>\n  <body>\n    <div class=\"container-fluid\">\n    <div class=\"col-9\">\n    <div class=\"row\">\n    <div class=\"template\"></div>\n    </div>\n    </div>\n    </div>\n    <script src=\"https://code.jquery.com/jquery-3.2.1.slim.min.js\" integrity=\"sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN\" crossorigin=\"anonymous\"></script>\n    <script src=\"https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js\" integrity=\"sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh\" crossorigin=\"anonymous\"></script>\n    <script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js\" integrity=\"sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ\" crossorigin=\"anonymous\"></script>\n  </body>\n</html>\n"
+      "\n<!doctype html>\n<html lang=\"en\">\n  <head>\n    <title class=\"template\"></title>\n    <meta charset=\"utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">\n    <link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css\" integrity=\"sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb\" crossorigin=\"anonymous\">\n  </head>\n  <body>\n    <main role=\"main\" class=\"container\">\n    <div class=\"col-9\">\n    <div class=\"row\">\n   <div class=\"intro\"></div> <div class=\"template\"></div>\n    </div>\n    </div>\n    </main>\n    <script src=\"https://code.jquery.com/jquery-3.2.1.slim.min.js\" integrity=\"sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN\" crossorigin=\"anonymous\"></script>\n    <script src=\"https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js\" integrity=\"sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh\" crossorigin=\"anonymous\"></script>\n    <script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js\" integrity=\"sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ\" crossorigin=\"anonymous\"></script>\n  </body>\n</html>\n"
       |> parse
     in
-    let table =
+    let href href inner_text =
+      create_element ~attributes:["href",href] ~inner_text "a" in
+   let table =
       create_element
-        ~classes:["table"; "table-sm"; "table-responsive"; "table-borders"]
+        ~classes:["table"; "table-sm"; "table-responsive"; "table-bordered"]
         "table"
     in
     let _ =
@@ -96,9 +98,9 @@ module Log_gen = struct
       (fun pkg_name ->
         let vs =
           Hashtbl.find h pkg_name
+          (* TODO OpamVersion.compare *)
           |> List.sort (fun (a, _) (b, _) -> String.compare a b)
         in
-        (* TODO OpamVersion.compare *)
         let row = create_element "tr" in
         append_child tbody row ;
         let th =
@@ -126,13 +128,32 @@ module Log_gen = struct
                 | exception Not_found ->
                     append_child vrow
                       (create_element ~classes:["table-warning"; "text-center"]
-                         ~inner_text:"n/a" "td"))
+                         ~inner_text:"" "td"))
               ovs)
           vs)
       pkg_names ;
+    let short_hash = String.with_range ~len:8 hash in
+    let title = Fmt.strf "Bulk build results for opam-repository revision %s" short_hash in
     replace (idx $ "title.template")
-      (create_element ~inner_text:"TODO" "title") ;
+      (create_element ~inner_text:title "title") ;
     replace (idx $ "div.template") table ;
+    let intro =
+      let nav =
+        let e = create_element ~attributes:["aria-label","breadcrumb"; "role","navigation"] "nav" in
+        let ol = create_element ~class_:"breadcrumb" "ol" in
+        append_child e ol;
+        append_child ol (create_element ~classes:["breadcrumb-item";"active"] ~inner_text:"Bulk Builds" "li");
+        append_child ol (create_element ~classes:["breadcrumb-item";"active"] ~inner_text:"By Compiler Version" "li");
+        append_child ol (create_element ~classes:["breadcrumb-item";"active"] ~attributes:["aria-current","page"] ~inner_text:short_hash "li");
+        e in
+      let e = create_element "p" in
+      append_child e (create_text "These are the opam2 bulk build results for the opam package repository (revision ");
+      append_child e (href ("https://github.com/ocaml/opam-repository/commit/" ^ hash) short_hash);
+      append_child e (create_text ").");
+      append_child nav e;
+      nav
+    in
+    replace (idx $ "div.intro") intro;
     idx
 
 
@@ -175,33 +196,7 @@ module Log_gen = struct
                 Hashtbl.replace h pkg_root res)
           res)
       logs ;
-    (*
-    process_one ~arch:`X86_64 ~ov:(OV.of_string "4.05.0") ~distro:(`Debian `V9) logs_dir hash >>= fun r1 ->
-    process_one ~arch:`X86_64 ~ov:(OV.of_string "4.06.0") ~distro:(`Debian `V9) logs_dir hash >>= fun r2 ->
-    List.partition (fun (_,r) -> r.C.success) r1 |> fun (ok1,fail1) ->
-    List.partition (fun (_,r) -> r.C.success) r2 |> fun (ok2,fail2) ->
-    Fmt.epr "4.05: (ok %d fail %d)\n" (List.length ok1) (List.length fail1);
-    Fmt.epr "4.06: (ok %d fail %d)\n" (List.length ok2) (List.length fail2);
-    let h = Hashtbl.create 1000 in
-    (* Populate base version *)
-    List.iter (fun (pkg,res) -> Hashtbl.add h pkg `Ok_fst) ok1;
-    List.iter (fun (pkg,res) -> Hashtbl.add h pkg (`Fail_fst res)) fail1;
-    List.iter (fun (pkg,res) ->
-      match Hashtbl.find h pkg with
-      | `Ok_fst -> Hashtbl.replace h pkg `Ok_both
-      | `Fail_fst res -> Hashtbl.replace h pkg (`Fixed_snd res)
-      | _ -> assert false
-      | exception Not_found -> Hashtbl.add h pkg `Ok_snd
-    ) ok2;
-    List.iter (fun (pkg,res) ->
-      match Hashtbl.find h pkg with
-      | `Ok_fst -> Hashtbl.replace h pkg (`Broken_snd res)
-      | `Fail_fst res' -> Hashtbl.replace h pkg (`Failed_both (res',res))
-      | _ -> assert false
-      | exception Not_found -> Hashtbl.add h pkg (`Failed_snd res)
-    ) fail2;
-*)
-    html_results_table h ovs |> Soup.pretty_print |> print_endline ;
+    html_results_table hash h ovs |> Soup.pretty_print |> print_endline ;
     Ok ()
 
 end
