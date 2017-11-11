@@ -192,39 +192,6 @@ module Opam = struct
     R.return env
 end
 
-module Mdlog = struct
-
-  type cmd =
-  {label:string; args:string list } [@@deriving sexp]
-  
-  type cmds = cmd list [@@deriving sexp]
-
-  type t = {
-    mutable cmds: cmds;
-    logs_dir: Fpath.t;
-    prefix: string;
-    descr: string;
-  }
-  
-  let init ~logs_dir ~prefix ~descr =
-    { cmds=[]; logs_dir; prefix; descr }
-
-  let run_parallel ?mode ?retries ?delay t label cmd args =
-    (* TODO still log on failure *)
-    let logs_dir = Fpath.(t.logs_dir) in
-    Parallel.run ?mode ?retries ?delay logs_dir label cmd args >>= fun jobs ->
-    t.cmds <- {label; args} :: t.cmds;
-    Ok ()
-
-  let run_cmd t label cmd =
-    run_log t.logs_dir label cmd
-
-  let output t =
-    let cmds = List.rev t.cmds in
-    Logs.info (fun l -> l "%s" (Sexplib.Sexp.to_string_hum (sexp_of_cmds cmds)));
-    Ok ()
-end
-
 open Cmdliner
 let setup_logs () =
   let setup_log style_renderer level =
