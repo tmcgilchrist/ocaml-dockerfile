@@ -51,8 +51,99 @@ let triage ext str_to_analyze =
   let status = Result.(Failed (analyze_all error, error)) in
   Result.string_of_status status
 
+  let html_results_table h ovs =
+    let open Soup in
+    let open Astring in
+    let idx = "
+<!doctype html>
+<html lang=\"en\">
+  <head>
+    <title class=\"template\"></title>
+    <meta charset=\"utf-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">
+    <link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css\" integrity=\"sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb\" crossorigin=\"anonymous\">
+  </head>
+  <body>
+    <div class=\"container-fluid\">
+    <div class=\"col-9\">
+    <div class=\"row\">
+    <div class=\"template\"></div>
+    </div>
+    </div>
+    </div>
+    <script src=\"https://code.jquery.com/jquery-3.2.1.slim.min.js\" integrity=\"sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN\" crossorigin=\"anonymous\"></script>
+    <script src=\"https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js\" integrity=\"sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh\" crossorigin=\"anonymous\"></script>
+    <script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js\" integrity=\"sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ\" crossorigin=\"anonymous\"></script>
+  </body>
+</html>
+" |> parse in
+    let table = create_element ~classes:["table";"table-sm";"table-responsive"; "table-borders"] "table" in
+    let _ =
+      let th = create_element "tr" in
+      append_child th (create_element ~classes:["w-25"] ~inner_text:"Package" "th");
+      append_child th (create_element ~classes:["w-25"] ~inner_text:"Version" "th");
+      List.iter (fun ov -> append_child th (create_element ~inner_text:ov "th")) ovs;
+      append_child table th;
+    in
+    let tbody = create_element "tbody" in
+    append_child table tbody;
+    (* Combine individual versions of packages *)
+    let pkg_names = Hashtbl.fold (fun k _ a -> k :: a) h [] |> List.sort String.compare in
+    List.iter (fun pkg_name ->
+      let vs = Hashtbl.find h pkg_name |> List.sort (fun (a,_) (b,_) -> String.compare a b) in (* TODO OpamVersion.compare *)
+      let row = create_element "tr" in
+      append_child tbody row;
+      let th = create_element ~attributes:["rowspan",string_of_int (List.length vs + 1)] ~inner_text:pkg_name "th" in
+      append_child row th;
+      List.iter (fun (v,r) ->
+         let vrow = create_element "tr" in
+         append_child vrow (create_element ~inner_text:v "td");
+         append_child row vrow;
+         List.iter (fun ov ->
+           match List.assoc ov r with 
+           | res when res.C.success = true -> append_child vrow (create_element ~classes:["table-success";"text-center"] ~inner_text:"ok" "td")
+           | res ->  append_child vrow (create_element ~classes:["table-danger"; "text-center"] ~inner_text:"err" "td")
+           | exception Not_found -> append_child vrow (create_element ~classes:["table-warning"; "text-center"] ~inner_text:"n/a" "td")
+         ) ovs;
+      ) vs;
+    ) pkg_names;
+    replace (idx $ "title.template") (create_element ~inner_text:"TODO" "title");
+    replace (idx $ "div.template") table;
+    idx
+
   (* Look through the matrix of options we know about *)
   let process logs_dir hash =
+    let open Astring in
+    let process_version ~ov =
+      match process_one ~arch:`X86_64 ~distro:(`Debian `V9) ~ov logs_dir hash with
+      | Ok l -> l
+      | Error _ -> assert false (*TODO*)
+    in
+    let process_versions ovs =
+      List.map (fun ov -> ov, (process_version ~ov:(OV.of_string ov))) ovs
+    in
+    let ovs = ["4.04.2"; "4.05.0"; "4.06.0"] in
+    let logs = process_versions ovs in
+    let h = Hashtbl.create 1000 in
+    List.iter (fun (ov, res) ->
+      List.iter (fun (pkg,r) ->
+        match String.cut ~sep:"." pkg with
+        | None -> Logs.info (fun l -> l "Cannot find version for pkg %s" pkg)
+        | Some (pkg_root, v) -> begin
+           let l =
+             match Hashtbl.find h pkg_root with
+             | hv -> hv
+             | exception Not_found -> [] in
+           let ov_res =
+             match List.assoc v l with
+             | ov_res -> (ov,r) :: ov_res
+             | exception Not_found -> [ov,r] in
+           let res = (v, ov_res) :: (List.remove_assoc v l) in
+           Hashtbl.replace h pkg_root res
+        end
+      ) res;
+    ) logs;
+(*
     process_one ~arch:`X86_64 ~ov:(OV.of_string "4.05.0") ~distro:(`Debian `V9) logs_dir hash >>= fun r1 ->
     process_one ~arch:`X86_64 ~ov:(OV.of_string "4.06.0") ~distro:(`Debian `V9) logs_dir hash >>= fun r2 ->
     List.partition (fun (_,r) -> r.C.success) r1 |> fun (ok1,fail1) ->
@@ -77,44 +168,8 @@ let triage ext str_to_analyze =
       | _ -> assert false
       | exception Not_found -> Hashtbl.add h pkg (`Failed_snd res)
     ) fail2;
-    let to_string pkg = function
-    | `Ok_fst -> "ok -> ()"
-    | `Ok_both -> "ok"
-    | `Fail_fst _ -> Fmt.strf "[err](#%s-1) -> ()" pkg
-    | `Fixed_snd _ -> Fmt.strf "[err](#%s-1) -> ok" pkg
-    | `Broken_snd _ -> Fmt.strf "ok -> [err](#%s-2)" pkg
-    | `Ok_snd -> "() -> ok"
-    | `Failed_both _ -> Fmt.strf "[err](#%s-1) -> [err](#%s-2)" pkg pkg
-    | `Failed_snd _ -> Fmt.strf "() -> [err](#%s-2)" pkg
-    in
-    Fmt.pr "| Package | Build Status |\n";
-    Fmt.pr "| ------- | ------------ |\n";
-    Hashtbl.iter (fun pkg st ->
-      match st with
-      | `Ok_both | `Ok_fst | `Ok_snd -> ()
-      | `Fail_fst _ | `Fixed_snd _ | `Broken_snd _ | `Failed_both _ | `Failed_snd _ ->
-      Fmt.pr "| %s | %s | \n" pkg (to_string pkg st);
-    ) h;
-    Fmt.pr "\n# Build Logs\n\n";
-    let list_trim num lines =
-      let rec fn l acc = function
-        | _ when l = 0 -> acc
-        | hd::tl -> fn (l-1) (hd::acc) tl
-        | [] -> acc in
-      fn num [] (List.rev lines) in
-    let print_log l =
-      print_endline "```\n";
-      Astring.String.cuts ~sep:"\n" l |>
-      list_trim 50 |>
-      List.iter print_endline;
-      Fmt.pr "```\n\n" in
-    Hashtbl.iter (fun pkg st ->
-      match st with
-      | `Ok_both | `Ok_fst | `Ok_snd -> ()
-      | `Fail_fst res -> Fmt.pr "## %s-1\n\n" pkg; print_log res.C.stdout
-      | `Fixed_snd res | `Broken_snd res | `Failed_snd res -> Fmt.pr "## %s-2\n\n" pkg; print_log res.C.stdout
-      | `Failed_both (res1,res2) -> Fmt.pr "## %s-1\n\n" pkg; print_log res1.C.stdout; Fmt.pr "## %s-2\n\n" pkg; print_log res2.C.stdout
-    ) h;
+*)
+    html_results_table h ovs |> Soup.pretty_print |> print_endline;
     Ok ()
 end
 
