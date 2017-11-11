@@ -24,26 +24,6 @@ let if_opt_m def opt fn = opt >>= function true -> fn () | false -> Ok def
 
 module Log_gen = struct
 
-  let phases = [ "phase1-arm64"; "phase1-amd64"; "phase2" ]
-  
-  let render_joblog f =
-    let open C.Parallel.Joblog in
-    v f |>
-    List.map (fun j ->
-    let result =
-      if j.exit_code = 0 then "ok" else "fail"
-    in
-    Fmt.strf "
-      <div class=\"joblog\">
-        <div class=\"joblog_result\">%s</div>
-        <div class=\"joblog_arg\">%s %s</div>
-        <div class=\"joblog_runtime\">(%.02fs)</div>
-      </div>
-    " result j.command j.arg j.run_time
-    )
-
-  module SM = Map.Make(String)
-
   let process_one ~arch ~ov ~distro logs_dir hash =
     let d = bulk_results_dir ~opam_repo_rev:hash ~arch ~ov ~distro logs_dir in
     if_opt_m [] (OS.Dir.exists d) @@ fun () ->
