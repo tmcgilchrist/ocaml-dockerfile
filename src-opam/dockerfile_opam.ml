@@ -209,10 +209,12 @@ let gen_opam2_distro ?labels d =
 
 (* Generate archive mirror *)
 let opam2_mirror (hub_id: string) =
-  header hub_id "alpine-3.6-ocaml-4.05.0" @@ run "sudo apk add --update bash m4"
-  @@ workdir "/home/opam/opam-repository" @@ run "git checkout master" @@ run "git pull origin master"
-  @@ run "opam admin upgrade" @@ run "git add ." @@ run "git commit -m sync -a" @@ run "opam init -a /home/opam/opam-repository"
-  @@ env ["OPAMJOBS","24"]
+  header hub_id "alpine-3.6-ocaml-4.05.0"
+  @@ run "sudo apk add --update bash m4"
+  @@ workdir "/home/opam/opam-repository" @@ run "git checkout master"
+  @@ run "git pull origin master" @@ run "opam admin upgrade"
+  @@ run "git add ." @@ run "git commit -m sync -a"
+  @@ run "opam init -a /home/opam/opam-repository" @@ env [("OPAMJOBS", "24")]
   @@ run "opam install -yj4 cohttp-lwt-unix" @@ run "opam admin cache"
 
 
@@ -224,17 +226,13 @@ let all_ocaml_compilers hub_id arch distro =
   let distro = D.tag_of_distro distro in
   let compilers =
     OV.Releases.recent_major |> List.filter (OV.Has.arch arch)
-    |> List.map OV.Opam.default_switch
-    |> List.map OV.to_string
+    |> List.map OV.Opam.default_switch |> List.map OV.to_string
     |> List.map (run "opam switch create %s") |> ( @@@ ) empty
   in
   let d =
     header hub_id (Fmt.strf "%s-opam" distro)
-    @@ workdir "/home/opam/opam-repository"
-    @@ run "git pull origin master"
-    @@ run "git checkout -b v2"
-    @@ run "opam admin upgrade"
-    @@ run "git add ."
+    @@ workdir "/home/opam/opam-repository" @@ run "git pull origin master"
+    @@ run "git checkout -b v2" @@ run "opam admin upgrade" @@ run "git add ."
     @@ run "git commit -m migrate -a"
     @@ run "opam init -k git -a /home/opam/opam-repository" @@ compilers
     @@ run "opam switch default"
@@ -248,21 +246,50 @@ let separate_ocaml_compilers hub_id arch distro =
   |> List.map (fun ov ->
          let default_switch = OV.(Opam.default_switch ov |> to_string) in
          let variants =
-           List.map OV.to_string (OV.Opam.variant_switches ov) |>
-           List.map (run "opam switch create %s")
-           |> ( @@@ ) empty
+           List.map OV.to_string (OV.Opam.variant_switches ov)
+           |> List.map (run "opam switch create %s") |> ( @@@ ) empty
          in
          let d =
            header hub_id (Fmt.strf "%s-opam" distro)
            @@ workdir "/home/opam/opam-repository"
-           @@ run "git pull origin master"
-           @@ run "git checkout -b v2"
-           @@ run "opam admin upgrade"
-           @@ run "git add ."
+           @@ run "git pull origin master" @@ run "git checkout -b v2"
+           @@ run "opam admin upgrade" @@ run "git add ."
            @@ run "git commit -m migrate -a"
            @@ run "opam init -k git -a /home/opam/opam-repository -c %s"
                 default_switch
            @@ variants @@ run "opam switch %s" default_switch
          in
          (Fmt.strf "%s-ocaml-%s" distro (tag_of_ocaml_version ov), d) )
+
+
+let bulk_build prod_hub_id distro ocaml_version () =
+  let ov_base = OV.(to_string (with_variant ocaml_version None)) in
+  header prod_hub_id (Fmt.strf "%s-ocaml-%s" (D.tag_of_distro distro) ov_base)
+  (* TODO do opam_repo_tag once we have a v2 opam-repo branch so we can pull *)
+  @@ run "opam switch %s" (OV.to_string ocaml_version)
+  @@ env [("OPAMYES", "1"); ("OPAMVERBOSE", "1"); ("OPAMJOBS", "2")]
+  (* TODO This is temporary until we can pull from a 2.0 branch *)
+  @@ workdir "/home/opam/opam-repository" @@ run "git checkout master"
+  @@ run "git pull origin master"
+  @@ run "git rev-parse HEAD > /home/opam/opam-repo-rev"
+  @@ run "opam admin upgrade" @@ run "git branch -D v2"
+  @@ run "git checkout -b v2" @@ run "git add ." @@ run "git commit -m sync -a"
+  @@ run "opam update"
+  @@ run
+       "opam pin add depext https://github.com/AltGr/opam-depext.git#opam-2-beta4"
+  @@ run "opam depext -uiy jbuilder ocamlfind"
+  |> fun dfile -> [("base", dfile)]
+
+
+let multiarch_manifest ~target ~platforms =
+  let ms =
+    List.map
+      (fun (image, arch) ->
+        Fmt.strf
+          "  -\n    image: %s\n    platform:\n      architecture: %s\n      os: linux"
+          image arch)
+      platforms
+    |> String.concat "\n"
+  in
+  Fmt.strf "image: %s\nmanifests:\n%s" target ms
 
