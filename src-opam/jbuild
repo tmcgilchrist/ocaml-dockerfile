@@ -5,4 +5,5 @@
   (public_name dockerfile-opam)
   (wrapped false)
   (libraries  (ocaml-version dockerfile fmt sexplib cmdliner astring))
+  (preprocess (per_module ((pps (ppx_sexp_conv)) (dockerfile_distro))))
  ))

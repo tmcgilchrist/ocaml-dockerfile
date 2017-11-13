@@ -10,6 +10,17 @@ let rec iter fn l =
   | hd::tl -> fn hd >>= fun () -> iter fn tl
   | [] -> Ok ()
 
+let map fn l =
+  List.map fn l |>
+  List.fold_left (fun acc b ->
+    match acc, b with
+    | Ok acc, Ok v -> Ok (v :: acc)
+    | Ok acc, Error v -> Error v
+    | Error _ as e, _ -> e
+  ) (Ok [])  |> function
+  | Ok v -> Ok (List.rev v)
+  | e -> e
+
 type cmd_log = {
   command: string;
   stdout: string;

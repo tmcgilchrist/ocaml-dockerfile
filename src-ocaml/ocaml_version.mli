@@ -1,5 +1,11 @@
 type t
 val v : ?patch:int -> ?extra:string -> int -> int -> t
+
+val major : t -> int
+val minor : t -> int
+val patch : t -> int option
+val extra : t -> string option
+
 val to_string : ?sep:char -> t -> string
 val of_string : string -> t
 val compare : t -> t -> int
@@ -10,6 +16,8 @@ val with_variant : t -> string option -> t
 
 type arch = [ `X86_64 | `Aarch64 ]
 val arches : arch list
+val string_of_arch : arch -> string
+val arch_of_string : string -> (arch, [> `Msg of string ]) result
 
 module Releases : sig
   val v4_00_1 : t

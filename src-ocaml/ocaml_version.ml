@@ -1,6 +1,11 @@
 type t = { major: int; minor: int; patch: int option; extra: string option }
 let v ?patch ?extra major minor = { major; minor; patch; extra }
 
+let major { major } = major
+let minor { minor } = minor
+let patch { patch } = patch
+let extra { extra } = extra
+
 let to_string ?(sep='+') =
   function
   | {major;minor;patch=None;extra=None} -> Printf.sprintf "%d.%02d" major minor
@@ -76,6 +81,15 @@ end
 
 type arch = [`X86_64 | `Aarch64 ]
 let arches = [ `X86_64; `Aarch64 ]
+
+let string_of_arch = function
+  | `Aarch64 -> "arm64"
+  | `X86_64 -> "amd64"
+
+let arch_of_string = function
+  | "arm64" | "aarch64" -> Ok `Aarch64
+  | "amd64" | "x86_64" -> Ok `X86_64
+  | arch -> Error (`Msg ("Unknown architecture " ^ arch))
 
 module Since = struct
   let bytes = of_string "4.03.0"

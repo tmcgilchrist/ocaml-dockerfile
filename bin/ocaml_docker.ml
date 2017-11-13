@@ -16,7 +16,7 @@ let bulk_results_dir ~opam_repo_rev ~arch ~ov ~distro logs_dir =
   |> fun distro ->
   arch_to_docker arch
   |> fun arch ->
-  OV.to_string ~sep:'-' ov
+  OV.to_string ov
   |> fun ov -> Fpath.(logs_dir / opam_repo_rev / arch / distro / ov)
 
 
