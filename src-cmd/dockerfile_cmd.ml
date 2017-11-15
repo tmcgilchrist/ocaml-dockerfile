@@ -144,8 +144,11 @@ module Parallel = struct
   type t = joblog list [@@deriving sexp]
   let bin = Cmd.(v "parallel")
 
-  let run_cmd ?(mode=`Local) ?(joblog="joblog.txt") ?delay ?retries ?results cmd args =
+  let run_cmd ?jobs ?(mode=`Local) ?(joblog="joblog.txt") ?delay ?retries ?results cmd args =
     let open Cmd in
+    let jobs = match jobs with
+     | None -> empty
+     | Some j -> v "--jobs" % (string_of_int j) in
     let mode = match mode with
      | `Local -> empty
      | `Remote (mmode, hosts) ->
@@ -168,12 +171,12 @@ module Parallel = struct
       match results with
       | None -> empty
       | Some r -> v "--results" % p r in
-    bin % "--no-notice" %% mode %% retries %% joblog %% delay %% results %% cmd % ":::" %% args
+    bin % "--no-notice" %% mode %% jobs %% retries %% joblog %% delay %% results %% cmd % ":::" %% args
 
-  let run ?mode ?delay ?retries logs_dir label cmd args =
+  let run ?mode ?delay ?jobs ?retries logs_dir label cmd args =
     let results = Fpath.(logs_dir / label) in
     OS.Dir.create ~path:true results >>= fun _ ->
-    let t = run_cmd ?mode ?delay ?retries ~results cmd args in
+    let t = run_cmd ?jobs ?mode ?delay ?retries ~results cmd args in
     run_log logs_dir label t >>= fun _ ->
     Joblog.v Fpath.(results / "joblog.txt") |>
     List.map (fun j ->
