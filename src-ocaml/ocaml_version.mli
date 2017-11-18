@@ -1,10 +1,48 @@
+(* Copyright (c) 2017 Anil Madhavapeddy
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ *)
+
+(** Manipulate, parse and generate OCaml version strings *)
+
 type t
-val v : ?patch:int -> ?extra:string -> int -> int -> t
+(** Type of an OCaml version string *)
 
 val major : t -> int
+(** [major t] will return the major version number of an OCaml
+    release.  For example, [of_string "4.03.0" |> major] will
+    return [4]. *)
+
 val minor : t -> int
+(** [minor t] will return the minor version number of an OCaml
+    release.  For example, [of_string "4.03.0" |> minor] will
+    return [3]. *)
+
 val patch : t -> int option
+(** [patch t] will return the patch version number of an OCaml
+    release.  For example, [of_string "4.03.0" |> minor] will
+    return [Some 0]. *)
+
 val extra : t -> string option
+(** [extra t] will return the additional information string of
+    an OCaml release.
+    For example, [of_string "4.03.0+flambda" |> extra] will
+    return [Some "flambda"]. *)
+
+
+val v : ?patch:int -> ?extra:string -> int -> int -> t
+
 
 val to_string : ?sep:char -> t -> string
 val of_string : string -> t
