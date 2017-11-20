@@ -23,7 +23,7 @@ type t = [
   | `Alpine of [ `V3_3 | `V3_4 | `V3_5 | `V3_6 | `Latest ]
   | `CentOS of [ `V6 | `V7 | `Latest ]
   | `Debian of [ `V9 | `V8 | `V7 | `Stable | `Testing | `Unstable ]
-  | `Fedora of [ `V21 | `V22 | `V23 | `V24 | `V25 | `V26 | `Latest ]
+  | `Fedora of [ `V21 | `V22 | `V23 | `V24 | `V25 | `V26 | `V27 | `Latest ]
   | `OracleLinux of [ `V7 | `Latest ]
   | `OpenSUSE of [ `V42_1 | `V42_2 | `V42_3 | `Latest ]
   | `Ubuntu of [ `V12_04 | `V14_04 | `V15_04 | `V15_10 | `V16_04 | `V16_10 | `V17_04 | `V17_10 | `LTS | `Latest ]
@@ -45,7 +45,7 @@ let distros = [
   `CentOS `V6; `CentOS `V7; `CentOS `Latest;
   `Debian `V9; `Debian `V8; `Debian `V7;
   `Debian `Stable; `Debian `Testing; `Debian `Unstable;
-  `Fedora `V23; `Fedora `V24; `Fedora `V25; `Fedora `V26; `Fedora `Latest;
+  `Fedora `V23; `Fedora `V24; `Fedora `V25; `Fedora `V26; `Fedora `V27; `Fedora `Latest;
   `OracleLinux `V7; `OracleLinux `Latest;
   `OpenSUSE `V42_1; `OpenSUSE `V42_2; `OpenSUSE `V42_3; `OpenSUSE `Latest;
   `Ubuntu `V12_04; `Ubuntu `V14_04; `Ubuntu `V15_04; `Ubuntu `V15_10;
@@ -65,7 +65,7 @@ let distro_status (d:t) : status = match d with
   | `Debian `Testing -> `Active
   | `Debian `Unstable -> `Active
   | `Fedora ( `V21 | `V22 | `V23 | `V24 | `V25 ) -> `Deprecated
-  | `Fedora `V26 -> `Active
+  | `Fedora (`V26 | `V27 ) -> `Active
   | `Fedora `Latest -> `Alias (`Fedora `V26)
   | `OracleLinux `V7 -> `Active
   | `OracleLinux `Latest -> `Alias (`OracleLinux `V7)
@@ -145,6 +145,7 @@ let rec builtin_ocaml_of_distro (d:t) : string option =
   |`Fedora `V24 -> Some "4.02.3"
   |`Fedora `V25 -> Some "4.02.3"
   |`Fedora `V26 -> Some "4.04.0"
+  |`Fedora `V27 -> Some "4.05.0"
   |`CentOS `V6 -> Some "3.11.2"
   |`CentOS `V7 -> Some "4.01.0"
   |`OpenSUSE `V42_1 -> Some "4.02.3"
@@ -183,6 +184,7 @@ let tag_of_distro (d:t) = match d with
   |`Fedora `V24 -> "fedora-24"
   |`Fedora `V25 -> "fedora-25"
   |`Fedora `V26 -> "fedora-26"
+  |`Fedora `V27 -> "fedora-27"
   |`OracleLinux `V7 -> "oraclelinux-7"
   |`OracleLinux `Latest -> "oraclelinux"
   |`Alpine `V3_3 -> "alpine-3.3"
@@ -220,6 +222,7 @@ let distro_of_tag x : t option = match x with
   |"fedora-24" -> Some (`Fedora `V24)
   |"fedora-25" -> Some (`Fedora `V25)
   |"fedora-26" -> Some (`Fedora `V26)
+  |"fedora-27" -> Some (`Fedora `V27)
   |"fedora" -> Some (`Fedora `Latest)
   |"oraclelinux-7" -> Some (`OracleLinux `V7)
   |"oraclelinux" -> Some (`OracleLinux `Latest)
@@ -259,6 +262,7 @@ let rec human_readable_string_of_distro (d:t) =
   |`Fedora `V24 -> "Fedora 24"
   |`Fedora `V25 -> "Fedora 25"
   |`Fedora `V26 -> "Fedora 26"
+  |`Fedora `V27 -> "Fedora 27"
   |`OracleLinux `V7 -> "OracleLinux 7"
   |`Alpine `V3_3 -> "Alpine 3.3"
   |`Alpine `V3_4 -> "Alpine 3.4"

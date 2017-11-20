@@ -1,4 +1,4 @@
-(* Copyright (c) 2017 Anil Madhavapeddy
+(* Copyright (c) 2017 Anil Madhavapeddy <anil@recoil.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,9 +42,12 @@ let parse s =
     end
 
 let of_string s =
+  try Ok (parse s) with
+  | exn -> Error (`Msg (Printf.sprintf "Unable to parse OCaml version '%s'" s))
+
+let of_string_exn s =
   try parse s with
-  | exn ->
-      raise (Invalid_argument (Printf.sprintf "Unable to parse OCaml version '%s'" s))
+  | exn -> raise (Invalid_argument (Printf.sprintf "Unable to parse OCaml version '%s'" s))
 
 let pp ppf v = Fmt.pf ppf "%s" (to_string v)
 
@@ -59,40 +62,56 @@ let compare {major; minor; patch; extra} a =
       compare patch a.patch ++ fun () ->
         compare extra a.extra
 
-let sys_version = of_string Sys.ocaml_version
+let sys_version = of_string_exn Sys.ocaml_version
 
 let with_variant t extra = { t with extra }
 
 module Releases = struct
-  let v4_00_1 = of_string "4.00.1"
-  let v4_01_0 = of_string "4.01.0"
-  let v4_02_0 = of_string "4.02.0"
-  let v4_02_1 = of_string "4.02.1"
-  let v4_02_2 = of_string "4.02.2"
-  let v4_02_3 = of_string "4.02.3"
-  let v4_03_0 = of_string "4.03.0"
-  let v4_04_0 = of_string "4.04.0"
-  let v4_04_1 = of_string "4.04.1"
-  let v4_04_2 = of_string "4.04.2"
-  let v4_05_0 = of_string "4.05.0"
-  let v4_06_0 = of_string "4.06.0"
+  let v4_00_0 = of_string_exn "4.00.0"
+  let v4_00_1 = of_string_exn "4.00.1"
+  let v4_00 = v4_00_1
 
-  let all = [
-    v4_00_1;
-    v4_01_0; v4_02_0; v4_02_1; v4_02_2; v4_02_3;
-    v4_03_0; v4_04_0; v4_04_1; v4_04_2; v4_05_0;
-    v4_06_0
-  ]
+  let v4_01_0 = of_string_exn "4.01.0"
+  let v4_01 = v4_01_0
 
-  let all_major = [ v4_00_1; v4_01_0; v4_02_3; v4_03_0; v4_04_2; v4_05_0; v4_06_0 ]
+  let v4_02_0 = of_string_exn "4.02.0"
+  let v4_02_1 = of_string_exn "4.02.1"
+  let v4_02_2 = of_string_exn "4.02.2"
+  let v4_02_3 = of_string_exn "4.02.3"
+  let v4_02 = v4_02_3
 
-  let recent_major = [ v4_03_0; v4_04_2; v4_05_0; v4_06_0 ]
+  let v4_03_0 = of_string_exn "4.03.0"
+  let v4_03 = v4_03_0
 
-  let dev = [ of_string "4.07.0" ]
+  let v4_04_0 = of_string_exn "4.04.0"
+  let v4_04_1 = of_string_exn "4.04.1"
+  let v4_04_2 = of_string_exn "4.04.2"
+  let v4_04 = v4_04_2
 
-  let recent_major_and_dev = List.concat [recent_major;dev]
+  let v4_05_0 = of_string_exn "4.05.0"
+  let v4_05 = v4_05_0
 
-  let latest_major = v4_06_0
+  let v4_06_0 = of_string_exn "4.06.0"
+  let v4_06 = v4_06_0
+
+  let v4_07_0 = of_string_exn "4.07.0"
+
+  let all_patches = [
+    v4_00_1; v4_01_0; v4_02_0; v4_02_1; v4_02_2;
+    v4_02_3; v4_03_0; v4_04_0; v4_04_1; v4_04_2;
+    v4_05_0; v4_06_0 ]
+
+  let all = [ v4_00; v4_01; v4_02; v4_03;
+    v4_04; v4_05; v4_06 ]
+
+  let recent = [ v4_03; v4_04; v4_05; v4_06 ]
+
+  let latest = v4_06
+
+  let dev = [ v4_07_0 ]
+
+  let recent_with_dev = List.concat [recent;dev]
+
 end
 
 type arch = [`X86_64 | `Aarch64 ]
@@ -107,15 +126,22 @@ let arch_of_string = function
   | "amd64" | "x86_64" -> Ok `X86_64
   | arch -> Error (`Msg ("Unknown architecture " ^ arch))
 
+let arch_of_string_exn a =
+  match arch_of_string a with
+  | Ok a -> a
+  | Error (`Msg m) -> raise (Invalid_argument m)
+
 module Since = struct
-  let bytes = of_string "4.03.0"
+  let bytes = Releases.v4_03_0
+
   let arch (a:arch) =
     match a with
-    | `Aarch64 -> of_string "4.03.0"
-    | `X86_64 -> of_string "3.07.0" (* TODO probably earlier *)
+    | `Aarch64 -> Releases.v4_03_0
+    | `X86_64 -> Releases.v4_00_0 (* TODO obviously earlier *)
 end
 
 module Has = struct
+
   let bytes v =
     match compare Since.bytes v with
     |(-1) | 0 -> true
@@ -125,6 +151,7 @@ module Has = struct
     match compare (Since.arch a) v with
     |(-1) | 0 -> true
     |n -> false
+
 end
 
 module Opam = struct

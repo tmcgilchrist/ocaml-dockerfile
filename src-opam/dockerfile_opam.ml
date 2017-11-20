@@ -225,7 +225,7 @@ let tag_of_ocaml_version ov =
 let all_ocaml_compilers hub_id arch distro =
   let distro = D.tag_of_distro distro in
   let compilers =
-    OV.Releases.recent_major |> List.filter (OV.Has.arch arch)
+    OV.Releases.recent |> List.filter (OV.Has.arch arch)
     |> List.map OV.Opam.default_switch |> List.map OV.to_string
     |> List.map (run "opam switch create %s") |> ( @@@ ) empty
   in
@@ -242,7 +242,7 @@ let all_ocaml_compilers hub_id arch distro =
 
 let separate_ocaml_compilers hub_id arch distro =
   let distro = D.tag_of_distro distro in
-  OV.Releases.recent_major_and_dev |> List.filter (OV.Has.arch arch)
+  OV.Releases.recent_with_dev |> List.filter (OV.Has.arch arch)
   |> List.map (fun ov ->
          let default_switch = OV.(Opam.default_switch ov |> to_string) in
          let variants =
