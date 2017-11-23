@@ -11,6 +11,7 @@ available: [ ocaml-version >= "4.02.3"]
 depends: [
   "jbuilder" {build & >="1.0+beta10"}
   "dockerfile" {>="3.0.0"}
+  "dockerfile-cmd"
   "cmdliner"
   "fmt"
   "logs"

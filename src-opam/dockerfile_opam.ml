@@ -169,11 +169,13 @@ let gen_opam2_distro ?labels d =
           match v with
           | `V12_04 -> "precise"
           | `V14_04 -> "trusty"
+          | `V15_04 -> "vivid"
+          | `V15_10 -> "wily"
           | `V16_04 -> "xenial"
           | `V16_10 -> "yakkety"
           | `V17_04 -> "zesty"
           | `V17_10 -> "artful"
-          | _ -> assert false
+          | `Latest | `LTS -> assert false
         in
         apt_opam2 ?labels ~distro:"ubuntu" ~tag ()
     | `CentOS v ->
@@ -188,7 +190,8 @@ let gen_opam2_distro ?labels d =
           | `V24 -> "24"
           | `V25 -> "25"
           | `V26 -> "26"
-          | _ -> assert false
+          | `V27 -> "27"
+          | `Latest -> assert false
         in
         yum_opam2 ?labels ~distro:"fedora" ~tag ()
     | `OracleLinux v ->
@@ -200,7 +203,7 @@ let gen_opam2_distro ?labels d =
           | `V42_1 -> "42.1"
           | `V42_2 -> "42.2"
           | `V42_3 -> "42.3"
-          | _ -> assert false
+          | `Latest -> assert false
         in
         zypper_opam2 ?labels ~distro:"opensuse" ~tag ()
   in
