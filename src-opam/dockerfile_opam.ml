@@ -71,6 +71,7 @@ let apk_opam2 ?(labels= []) ~distro ~tag () =
        "build-base tar ca-certificates git rsync curl sudo bash"
   @@ Linux.Apk.add_user ~uid:1000 ~sudo:true "opam" @@ Linux.Git.init ()
   @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
+  @@ cmd "bash"
   @@ run
        "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
@@ -120,6 +121,7 @@ let yum_opam2 ?(labels= []) ~distro ~tag () =
        "sed -i.bak '/LC_TIME LC_ALL LANGUAGE/aDefaults    env_keep += \"OPAMYES OPAMJOBS OPAMVERBOSE\"' /etc/sudoers"
   @@ Linux.RPM.add_user ~uid:1000 ~sudo:true "opam" @@ Linux.Git.init ()
   @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
+  @@ cmd "bash"
   @@ run
        "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
@@ -136,6 +138,7 @@ let zypper_opam2 ?(labels= []) ~distro ~tag () =
        ~dst:"/usr/bin/opam-installer" ()
   @@ Linux.Zypper.add_user ~uid:1000 ~sudo:true "opam" @@ Linux.Git.init ()
   @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
+  @@ cmd "bash"
   @@ run
        "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
 
@@ -235,8 +238,6 @@ let all_ocaml_compilers hub_id arch distro =
   let d =
     header hub_id (Fmt.strf "%s-opam" distro)
     @@ workdir "/home/opam/opam-repository" @@ run "git pull origin master"
-    @@ run "git checkout -b v2" @@ run "opam admin upgrade" @@ run "git add ."
-    @@ run "git commit -m migrate -a"
     @@ run "opam init -k git -a /home/opam/opam-repository" @@ compilers
     @@ run "opam switch default"
   in
@@ -255,9 +256,6 @@ let separate_ocaml_compilers hub_id arch distro =
          let d =
            header hub_id (Fmt.strf "%s-opam" distro)
            @@ workdir "/home/opam/opam-repository"
-           @@ run "git pull origin master" @@ run "git checkout -b v2"
-           @@ run "opam admin upgrade" @@ run "git add ."
-           @@ run "git commit -m migrate -a"
            @@ run "opam init -k git -a /home/opam/opam-repository -c %s"
                 default_switch
            @@ variants @@ run "opam switch %s" default_switch
@@ -271,16 +269,11 @@ let bulk_build prod_hub_id distro ocaml_version () =
   (* TODO do opam_repo_tag once we have a v2 opam-repo branch so we can pull *)
   @@ run "opam switch %s" (OV.to_string ocaml_version)
   @@ env [("OPAMYES", "1"); ("OPAMVERBOSE", "1"); ("OPAMJOBS", "2")]
-  (* TODO This is temporary until we can pull from a 2.0 branch *)
   @@ workdir "/home/opam/opam-repository" @@ run "git checkout master"
   @@ run "git pull origin master"
   @@ run "git rev-parse HEAD > /home/opam/opam-repo-rev"
-  @@ run "opam admin upgrade" @@ run "git branch -D v2"
-  @@ run "git checkout -b v2" @@ run "git add ." @@ run "git commit -m sync -a"
   @@ run "opam update"
-  @@ run
-       "opam pin add depext https://github.com/AltGr/opam-depext.git#opam-2-beta4"
-  @@ run "opam depext -uiy jbuilder ocamlfind"
+  @@ run "opam install depext jbuilder ocamlfind"
   |> fun dfile -> [("base", dfile)]
 
 
