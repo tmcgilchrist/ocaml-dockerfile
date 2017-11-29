@@ -72,8 +72,6 @@ let apk_opam2 ?(labels= []) ~distro ~tag () =
   @@ Linux.Apk.add_user ~uid:1000 ~sudo:true "opam" @@ Linux.Git.init ()
   @@ run
        "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
-  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
-  @@ cmd "bash"
 
 
 (* Debian based Dockerfile *)
@@ -89,8 +87,6 @@ let apt_opam2 ?(labels= []) ~distro ~tag () =
   @@ Linux.Apt.add_user ~uid:1000 ~sudo:true "opam" @@ Linux.Git.init ()
   @@ run
        "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
-  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
-  @@ cmd "bash"
 
 
 (* RPM based Dockerfile *)
@@ -123,8 +119,6 @@ let yum_opam2 ?(labels= []) ~distro ~tag () =
   @@ Linux.RPM.add_user ~uid:1000 ~sudo:true "opam" @@ Linux.Git.init ()
   @@ run
        "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
-  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
-  @@ cmd "bash"
 
 
 (* Zypper based Dockerfile *)
@@ -140,8 +134,6 @@ let zypper_opam2 ?(labels= []) ~distro ~tag () =
   @@ Linux.Zypper.add_user ~uid:1000 ~sudo:true "opam" @@ Linux.Git.init ()
   @@ run
        "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
-  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
-  @@ cmd "bash"
 
 
 let gen_opam2_distro ?labels d =
@@ -219,8 +211,7 @@ let opam2_mirror (hub_id: string) =
   header hub_id "alpine-3.6-ocaml-4.05.0"
   @@ run "sudo apk add --update bash m4"
   @@ workdir "/home/opam/opam-repository" @@ run "git checkout master"
-  @@ run "git pull origin master" @@ run "opam admin upgrade"
-  @@ run "git add ." @@ run "git commit -m sync -a"
+  @@ run "git pull origin master"
   @@ run "opam init -a /home/opam/opam-repository" @@ env [("OPAMJOBS", "24")]
   @@ run "opam install -yj4 cohttp-lwt-unix" @@ run "opam admin cache"
 
@@ -241,6 +232,8 @@ let all_ocaml_compilers hub_id arch distro =
     @@ workdir "/home/opam/opam-repository" @@ run "git pull origin master"
     @@ run "opam init -k git -a /home/opam/opam-repository" @@ compilers
     @@ run "opam switch default"
+    @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
+    @@ cmd "bash"
   in
   (Fmt.strf "%s-ocaml" distro, d)
 
@@ -260,6 +253,8 @@ let separate_ocaml_compilers hub_id arch distro =
            @@ run "opam init -k git -a /home/opam/opam-repository -c %s"
                 default_switch
            @@ variants @@ run "opam switch %s" default_switch
+           @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
+           @@ cmd "bash"
          in
          (Fmt.strf "%s-ocaml-%s" distro (tag_of_ocaml_version ov), d) )
 
