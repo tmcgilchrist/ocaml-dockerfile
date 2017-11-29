@@ -70,10 +70,10 @@ let apk_opam2 ?(labels= []) ~distro ~tag () =
   @@ Linux.Apk.install
        "build-base tar ca-certificates git rsync curl sudo bash"
   @@ Linux.Apk.add_user ~uid:1000 ~sudo:true "opam" @@ Linux.Git.init ()
-  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
-  @@ cmd "bash"
   @@ run
        "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
+  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
+  @@ cmd "bash"
 
 
 (* Debian based Dockerfile *)
@@ -87,9 +87,10 @@ let apt_opam2 ?(labels= []) ~distro ~tag () =
        ~dst:"/usr/bin/opam-installer" ()
   @@ Linux.Apt.install "build-essential curl git rsync sudo unzip"
   @@ Linux.Apt.add_user ~uid:1000 ~sudo:true "opam" @@ Linux.Git.init ()
-  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
   @@ run
        "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
+  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
+  @@ cmd "bash"
 
 
 (* RPM based Dockerfile *)
@@ -120,10 +121,10 @@ let yum_opam2 ?(labels= []) ~distro ~tag () =
   @@ run
        "sed -i.bak '/LC_TIME LC_ALL LANGUAGE/aDefaults    env_keep += \"OPAMYES OPAMJOBS OPAMVERBOSE\"' /etc/sudoers"
   @@ Linux.RPM.add_user ~uid:1000 ~sudo:true "opam" @@ Linux.Git.init ()
-  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
-  @@ cmd "bash"
   @@ run
        "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
+  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
+  @@ cmd "bash"
 
 
 (* Zypper based Dockerfile *)
@@ -137,10 +138,10 @@ let zypper_opam2 ?(labels= []) ~distro ~tag () =
   @@ copy ~from:"0" ~src:["/usr/bin/opam-installer"]
        ~dst:"/usr/bin/opam-installer" ()
   @@ Linux.Zypper.add_user ~uid:1000 ~sudo:true "opam" @@ Linux.Git.init ()
-  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
-  @@ cmd "bash"
   @@ run
        "git clone git://github.com/ocaml/opam-repository /home/opam/opam-repository"
+  @@ entrypoint_exec ["opam"; "config"; "exec"; "--"]
+  @@ cmd "bash"
 
 
 let gen_opam2_distro ?labels d =
