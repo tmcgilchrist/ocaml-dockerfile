@@ -269,7 +269,8 @@ let bulk_build prod_hub_id distro ocaml_version () =
   @@ run "git pull origin master"
   @@ run "git rev-parse HEAD > /home/opam/opam-repo-rev"
   @@ run "opam update"
-  @@ run "opam install depext jbuilder ocamlfind"
+  @@ run "opam install -y depext"
+  @@ run "opam depext -iy jbuilder ocamlfind"
   |> fun dfile -> [("base", dfile)]
 
 
