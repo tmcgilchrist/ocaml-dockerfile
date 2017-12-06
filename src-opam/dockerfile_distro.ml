@@ -297,4 +297,3 @@ let latest_tag_of_distro (t:t) =
 
 let compare a b =
   String.compare (human_readable_string_of_distro a) (human_readable_string_of_distro b)
-

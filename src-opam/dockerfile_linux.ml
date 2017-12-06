@@ -135,7 +135,7 @@ end
 (* Zypper (opensuse) rules *)
 module Zypper = struct
   let update = run "zypper update -y"
-  let install fmt = ksprintf (fun s -> update @@ run "zypper install -y %s" s) fmt
+  let install fmt = ksprintf (fun s -> update @@ run "zypper install --force-resolution -y %s" s) fmt
 
   let dev_packages ?extra () =
     install "-t pattern devel_C_C++" @@
