@@ -62,6 +62,6 @@ val separate_ocaml_compilers :
   string -> Ocaml_version.arch -> Dockerfile_distro.t
   -> (string * Dockerfile.t) list
 
-val bulk_build : string -> Dockerfile_distro.t -> Ocaml_version.t -> unit -> (string * Dockerfile.t) list
+val bulk_build : string -> Dockerfile_distro.t -> Ocaml_version.t -> string -> (string * Dockerfile.t) list
 
 val multiarch_manifest : target:string -> platforms:(string * string) list -> string

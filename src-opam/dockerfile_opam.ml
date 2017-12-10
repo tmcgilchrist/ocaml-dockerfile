@@ -259,20 +259,18 @@ let separate_ocaml_compilers hub_id arch distro =
          (Fmt.strf "%s-ocaml-%s" distro (tag_of_ocaml_version ov), d) )
 
 
-let bulk_build prod_hub_id distro ocaml_version () =
+let bulk_build prod_hub_id distro ocaml_version opam_repo_rev =
   let ov_base = OV.(to_string (with_variant ocaml_version None)) in
   header prod_hub_id (Fmt.strf "%s-ocaml-%s" (D.tag_of_distro distro) ov_base)
-  (* TODO do opam_repo_tag once we have a v2 opam-repo branch so we can pull *)
   @@ run "opam switch %s" (OV.to_string ocaml_version)
   @@ env [("OPAMYES", "1"); ("OPAMVERBOSE", "1"); ("OPAMJOBS", "2")]
-  @@ workdir "/home/opam/opam-repository" @@ run "git checkout master"
+  @@ workdir "/home/opam/opam-repository"
   @@ run "git pull origin master"
-  @@ run "git rev-parse HEAD > /home/opam/opam-repo-rev"
+  @@ run "git checkout %s" opam_repo_rev
   @@ run "opam update"
   @@ run "opam install -y depext"
   @@ run "opam depext -iy jbuilder ocamlfind"
-  |> fun dfile -> [("base", dfile)]
-
+  |> fun dfile -> [opam_repo_rev, dfile]
 
 let multiarch_manifest ~target ~platforms =
   let ms =
