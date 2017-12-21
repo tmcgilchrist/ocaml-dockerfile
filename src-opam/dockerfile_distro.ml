@@ -64,8 +64,8 @@ let distro_status (d:t) : status = match d with
   | `Debian `Stable -> `Alias (`Debian `V9)
   | `Debian `Testing -> `Active
   | `Debian `Unstable -> `Active
-  | `Fedora ( `V21 | `V22 | `V23 | `V24 | `V25 ) -> `Deprecated
-  | `Fedora (`V26 | `V27 ) -> `Active
+  | `Fedora ( `V21 | `V22 | `V23 | `V24 ) -> `Deprecated
+  | `Fedora (`V25 | `V26 | `V27 ) -> `Active
   | `Fedora `Latest -> `Alias (`Fedora `V26)
   | `OracleLinux `V7 -> `Active
   | `OracleLinux `Latest -> `Alias (`OracleLinux `V7)
