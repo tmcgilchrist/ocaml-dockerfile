@@ -15,7 +15,7 @@ let map fn l =
   List.fold_left (fun acc b ->
     match acc, b with
     | Ok acc, Ok v -> Ok (v :: acc)
-    | Ok acc, Error v -> Error v
+    | Ok _acc, Error v -> Error v
     | Error _ as e, _ -> e
   ) (Ok [])  |> function
   | Ok v -> Ok (List.rev v)
@@ -72,13 +72,13 @@ module Docker = struct
     let rec find_id =
       function
       | hd::tl when String.is_prefix ~affix:"Successfully tagged " hd -> find_id tl
-      | hd::tl when String.is_prefix ~affix:"Successfully built " hd -> begin
+      | hd::_ when String.is_prefix ~affix:"Successfully built " hd -> begin
          match String.cut ~sep:"Successfully built " hd with
          | Some ("", id) -> R.ok id
          | Some _ -> R.error_msg "Unexpected internal error in build_id"
          | None -> R.error_msg "Malformed successfully built log"
       end
-      | hd::tl -> R.error_msg "Unexpected lines at end of log"
+      | _hd::_tl -> R.error_msg "Unexpected lines at end of log"
       | [] -> R.error_msg "Unable to find container id in log" in
     OS.File.read_lines log >>= fun lines ->
     List.rev lines |> fun lines ->

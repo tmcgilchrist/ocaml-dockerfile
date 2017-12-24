@@ -79,8 +79,6 @@ let crunch l =
   fixp pack l
 
 
-let nl fmt = ksprintf (fun b -> b ^ "\n") fmt
-
 let quote s = sprintf "%S" s
 
 let cmd c r = c ^ " " ^ r

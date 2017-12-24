@@ -17,7 +17,6 @@
 
 (** Distro selection for various OPAM combinations *)
 open Astring
-open Dockerfile
 
 type t = [ 
   | `Alpine of [ `V3_3 | `V3_4 | `V3_5 | `V3_6 | `Latest ]
@@ -98,20 +97,6 @@ let distro_arches (d:t) : arch list =
 
 module OV = Ocaml_version
 
-let ocaml_arches ov : arch list =
-  match ov with
-  | "4.00.1" | "4.01.0" | "4.02.3" ->
-     [ `X86_64 ]
-  | "4.03.0" | "4.03.0+flambda"
-  | "4.04.0" | "4.04.1" | "4.04.2" | "4.04.2+flambda"
-  | "4.05.0" | "4.05.0+flambda" | "4.06.0" | "4.06.0+flambda" ->
-     [ `X86_64; `Aarch64 ]
-  | _ -> failwith "unknown ocaml version for ocaml_arches"
-
-(* TODO remove duplication with ocaml_version library *)
-let ocaml_supported_on (a:arch) ov =
-  List.mem a (ocaml_arches ov)
-
 let distro_supported_on (a:arch) (d:t) =
   List.mem a (distro_arches d)
 
@@ -122,7 +107,7 @@ let inactive_distros =
   List.filter (fun d -> distro_status d = `Deprecated) distros
 
 (* The distro-supplied version of OCaml *)
-let rec builtin_ocaml_of_distro (d:t) : string option =
+let builtin_ocaml_of_distro (d:t) : string option =
   match resolve_alias d with
   |`Debian `V7 -> Some "3.12.1"
   |`Debian `V8 -> Some "4.01.0"

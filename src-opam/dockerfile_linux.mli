@@ -90,9 +90,8 @@ module Apk : sig
       password.  If [sudo] is true then root access with no password will also be
       configured.  The default value for [sudo] is [false]. *)
 
-  val install_system_ocaml : string -> t
-  (** Install the system OCaml packages via Apk. *)
-
+  val install_system_ocaml : t
+  (** Install the system OCaml packages via Apk *)
 end
 
 (** Rules for Zypper-based distributions such as OpenSUSE *)

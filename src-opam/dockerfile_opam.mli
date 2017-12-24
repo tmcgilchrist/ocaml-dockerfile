@@ -33,10 +33,6 @@ val header : ?maintainer:string -> string -> string -> Dockerfile.t
 (** [header image tag] initalises a fresh Dockerfile using the [image:tag]
     as its base. *)
 
-val apk_opam2 :
-  ?labels:(string * string) list -> distro:string -> tag:string -> unit
-  -> Dockerfile.t
-
 val yum_opam2 :
   ?labels:(string * string) list -> distro:string -> tag:string -> unit
   -> Dockerfile.t

@@ -44,9 +44,7 @@ val distros : t list
 (** Enumeration of the supported Docker container distributions *)
 
 val distro_arches : t -> arch list
-val ocaml_arches : string -> arch list
 val distro_supported_on : arch -> t -> bool
-val ocaml_supported_on : arch -> string -> bool
 val active_distros : t list
 val inactive_distros : t list
 val latest_distros : t list

@@ -18,14 +18,11 @@
 (** OPAM-specific Dockerfile rules *)
 
 open Dockerfile
-open Printf
 module Linux = Dockerfile_linux
 module D = Dockerfile_distro
 module OV = Ocaml_version
 
 let run_as_opam fmt = Linux.run_as_user "opam" fmt
-
-let opamhome = "/home/opam"
 
 let install_opam_from_source ?(prefix= "/usr/local") ?(install_wrappers= false)
     ?(branch= "master") () =

@@ -23,8 +23,8 @@ let run_as_user user fmt = ksprintf (run "sudo -u %s sh -c %S" user) fmt
 
 module Git = struct
   let init ?(name="Docker") ?(email="docker@example.com") () =
-    run "git config --global user.email %S" "docker@example.com" @@
-    run "git config --global user.name %S" "Docker CI"
+    run "git config --global user.email %S" email @@
+    run "git config --global user.name %S" name
 end
 
 let sudo_nopasswd = "ALL=(ALL:ALL) NOPASSWD:ALL"
@@ -128,7 +128,7 @@ module Apk = struct
     run "mkdir .ssh" @@
     run "chmod 700 .ssh"
 
-  let install_system_ocaml version =
+  let install_system_ocaml =
     run "apk add ocaml camlp4"
 end
 
