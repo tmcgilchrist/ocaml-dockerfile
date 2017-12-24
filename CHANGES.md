@@ -13,6 +13,7 @@ Major API iteration to:
 Other changes:
 * Also mark OCaml 4.05.0 as a mainline release for opam2 as well.
 * Update OPAM 2 build mechanism to use `make cold`.
+* Drop support for opam1 containers; use an older library version for those.
 
 v3.1.0 2017-07-14 Cambridge
 ---------------------------
