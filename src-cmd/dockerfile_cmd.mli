@@ -15,19 +15,31 @@
  *
  *)
 
+(** Command invocation library to help with Docker builds.
+
+    This module primarily exposes utility functions to glue together
+    Docker-based scripts for (e.g.) continuous integration systems
+    like the ocaml-ci.  The interface is fairly domain-specific and
+    does not expose all the functionality of the underlying tools.
+    Feel free to contribute more functions if you need them. *)
+
 type cmd_log = {
   command: string;
   stdout: string;
   success: bool;
   status: [ `Signaled of int | `Exited of int ]
 } [@@deriving sexp]
+(** Results of a command invocation *)
 
 val run_log :
   ?ok_to_fail:bool ->
   ?env:Bos.OS.Env.t ->
   Fpath.t ->
   string -> Bos.Cmd.t -> (unit, [> Rresult.R.msg ]) result
+(** [runlog log_dir name cmd] will run [cmd] with label [name] 
+   and log the results in [<log_dir>/<name>.sxp]. *)
 
+(** Docker command invocation *)
 module Docker : sig
   val bin : Bos.Cmd.t
 
@@ -59,6 +71,7 @@ module Docker : sig
   val manifest_push_file : Fpath.t -> Bos.Cmd.t
 end
 
+(** GNU Parallel command invocation *)
 module Parallel : sig
 
   module Joblog : sig
@@ -89,6 +102,7 @@ module Parallel : sig
  
 end
 
+(** Opam2 command invocation *)
 module Opam : sig
   val bin : Bos.Cmd.t
 
@@ -98,7 +112,10 @@ module Opam : sig
 
 end
 
+(** {2 Utility functions} *)
+
 val setup_logs : unit -> unit Cmdliner.Term.t 
+(** [setup_logs ()] initialises a {!Logs} environment. *)
 
 val iter : ('a -> (unit, 'b) result) -> 'a list -> (unit, 'b) result
 
