@@ -315,7 +315,7 @@ type distro =
     | `V23_04 ]
   | `Cygwin of win10_release
   | `Windows of [ `Mingw | `Msvc ] * win10_release ]
-[@@deriving sexp]
+[@@deriving sexp, eq, compare]
 
 type t =
   [ `Alpine of

@@ -88,6 +88,7 @@
   (fmt (>= "0.8.7"))
   (ocaml-version (>= "3.5.0"))
   (ppx_sexp_conv (>= "v0.9.0"))
+  ppx_deriving
   sexplib)
  (conflicts
   (result (< 1.5))
