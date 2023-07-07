@@ -160,7 +160,7 @@ type distro =
     | `V23_04 ]
   | `Cygwin of win10_release
   | `Windows of [ `Mingw | `Msvc ] * win10_release ]
-[@@deriving sexp, eq, compare]
+[@@deriving sexp, eq]
 (** Supported Docker container distributions without aliases. *)
 
 type t =
@@ -243,7 +243,7 @@ type t =
     | `LTS ]
   | `Cygwin of win_all
   | `Windows of [ `Mingw | `Msvc ] * win_all ]
-[@@deriving sexp]
+[@@deriving sexp, eq]
 (** Supported Docker container distributions with aliases such as [`Latest]. *)
 
 type os_family = [ `Cygwin | `Linux | `Windows ] [@@deriving sexp]

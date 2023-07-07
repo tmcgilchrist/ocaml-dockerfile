@@ -34,10 +34,10 @@ type win10_release =
   | `V20H2
   | `V21H1
   | `V21H2 ]
-[@@deriving sexp]
+[@@deriving sexp, eq]
 
 type win10_ltsc = [ `Ltsc2015 | `Ltsc2016 | `Ltsc2019 | `Ltsc2022 ]
-[@@deriving sexp]
+[@@deriving sexp, eq]
 
 type win10_lcu =
   [ `LCU
@@ -68,7 +68,7 @@ type win10_lcu =
   | `LCU20210608 ]
 [@@deriving sexp]
 
-type win_all = [ win10_release | win10_ltsc ] [@@deriving sexp]
+type win_all = [ win10_release | win10_ltsc ] [@@deriving sexp, eq]
 
 let win10_current_lcu = `LCU20230613
 
@@ -315,7 +315,7 @@ type distro =
     | `V23_04 ]
   | `Cygwin of win10_release
   | `Windows of [ `Mingw | `Msvc ] * win10_release ]
-[@@deriving sexp, eq, compare]
+[@@deriving sexp, eq]
 
 type t =
   [ `Alpine of
@@ -397,7 +397,7 @@ type t =
     | `LTS ]
   | `Cygwin of win_all
   | `Windows of [ `Mingw | `Msvc ] * win_all ]
-[@@deriving sexp]
+[@@deriving sexp, eq]
 
 type os_family = [ `Cygwin | `Linux | `Windows ] [@@deriving sexp]
 
